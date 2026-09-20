@@ -227,8 +227,14 @@ async def submit_offer(
             )
         await _guard_pending_selection(session, request_id, specialist_id)
         next_number = (
-            max((v.version_number for v in offer.versions), default=0) + 1
-        )
+            await session.scalar(
+                select(OfferVersion.version_number)
+                .where(OfferVersion.offer_id == offer.id)
+                .order_by(OfferVersion.version_number.desc())
+                .limit(1)
+            )
+            or 0
+        ) + 1
 
     totals = compute_totals(lines)
     offer_version = OfferVersion(
