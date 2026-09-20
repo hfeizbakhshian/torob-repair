@@ -1,0 +1,43 @@
+# PostgreSQL for local development and for the isolated test database.
+# The API, the worker and the web UI all run on the host; only the database is containerised.
+
+services:
+  db:
+    image: postgres:18
+    container_name: torob_repair_db
+    environment:
+      POSTGRES_USER: torob
+      POSTGRES_PASSWORD: torob
+      POSTGRES_DB: torob_repair
+    ports:
+      - "127.0.0.1:5437:5432"
+    volumes:
+      - torob_repair_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U torob -d torob_repair"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  db-test:
+    image: postgres:18
+    container_name: torob_repair_db_test
+    profiles: ["test"]
+    environment:
+      POSTGRES_USER: torob
+      POSTGRES_PASSWORD: torob
+      POSTGRES_DB: torob_repair_test
+    ports:
+      - "127.0.0.1:5438:5432"
+    volumes:
+      - torob_repair_pgdata_test:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U torob -d torob_repair_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  torob_repair_pgdata:
+  torob_repair_pgdata_test:
