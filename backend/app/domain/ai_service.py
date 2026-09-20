@@ -81,7 +81,7 @@ def estimate_tokens(messages: list[AiMessage], policy: Policy) -> tuple[int, boo
         import tiktoken
 
         encoding = tiktoken.encoding_for_model(settings.ai_model)
-    except Exception:
+    except Exception:  # noqa: BLE001 - any failure here just means "no tokenizer"
         encoding = None
 
     if encoding is not None:
