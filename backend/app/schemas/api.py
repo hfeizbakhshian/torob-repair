@@ -348,6 +348,10 @@ class CancelInput(ApiModel):
 # --- expenses and completion ---------------------------------------------
 
 
+class CaseQuestionInput(ApiModel):
+    question: str = Field(min_length=1, max_length=1000)
+
+
 class ExtractExpensesInput(ApiModel):
     text: str = Field(min_length=1, max_length=4000)
 
@@ -534,6 +538,7 @@ class DisputeOut(ApiModel):
     customer_closed_statements_at: datetime | None
     specialist_closed_statements_at: datetime | None
     evidence_rounds_used: int
+    support_evidence: list[dict[str, Any]] = Field(default_factory=list)
     resolved_at: datetime | None
     statements: list[dict[str, Any]]
     current_proposal: dict[str, Any] | None
@@ -582,6 +587,11 @@ class EvaluationOut(ApiModel):
 class AppealInput(ApiModel):
     reason: str = Field(min_length=1, max_length=600)
     evidence_note: str | None = Field(default=None, max_length=600)
+
+
+class SupportEvidenceInput(ApiModel):
+    note: str = Field(min_length=1, max_length=2000)
+    attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=10)
 
 
 class ExtendBudgetInput(ApiModel):

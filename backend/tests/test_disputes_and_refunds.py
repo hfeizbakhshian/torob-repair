@@ -827,3 +827,48 @@ async def test_adjudicated_case_also_queues_its_evaluation(session, policy, adva
         ).scalars()
     )
     assert len(queued) == 1
+
+
+async def test_support_completes_the_evidence_without_ruling(session, policy, advance):
+    """Support fills gaps in the record; it never issues or rewrites the ruling."""
+    _, _, _, dispute = await disputed_case(session, policy, advance)
+    snapshot = await service.build_snapshot(session, dispute)
+    await session.commit()
+    dispute.status = DisputeStatus.needs_evidence
+    await session.commit()
+
+    support = await factories.support_user(session)
+    updated = await service.add_support_evidence(
+        session, dispute_id=dispute.id, support_id=support.id,
+        note="فاکتور فروشنده از پرونده استخراج و پیوست شد.", attachment_ids=[],
+    )
+    await session.commit()
+
+    assert len(updated.support_evidence) == 1
+    # The frozen input is expired, so the next round sees the completed record.
+    await session.refresh(snapshot)
+    assert snapshot.expired_at is not None
+
+    fresh = await service.build_snapshot(session, dispute)
+    await session.commit()
+    assert updated.support_evidence[0]["id"] in fresh.evidence_ids
+    assert fresh.payload["supportEvidence"][0]["note"].startswith("فاکتور")
+
+    # No settlement appeared from support's action alone.
+    settlements = list((await session.execute(select(Settlement))).scalars())
+    assert settlements == []
+
+
+async def test_support_cannot_add_evidence_after_the_ruling(session, policy, advance, ai):
+    _, _, _, dispute = await disputed_case(session, policy, advance)
+    advance(hours=25)
+    await session.commit()
+    await ai_flows.adjudicate_dispute(ai, dispute_id=dispute.id, allow_evidence_round=False)
+    await session.close()
+
+    support = await factories.support_user(session)
+    with pytest.raises(DomainError, match="پیش از صدور حکم"):
+        await service.add_support_evidence(
+            session, dispute_id=dispute.id, support_id=support.id,
+            note="دیر رسید", attachment_ids=[],
+        )

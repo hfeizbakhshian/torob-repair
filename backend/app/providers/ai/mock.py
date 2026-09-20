@@ -226,6 +226,50 @@ class MockAiProvider:
             "note": DEMO_NOTE,
         }
 
+    def _build_CaseGuidance(self, context: dict[str, Any]) -> dict[str, Any]:
+        question = str(context.get("question", ""))
+        agreement_total = context.get("agreementTotalToman")
+        based_on: list[str] = []
+        unknowns: list[str] = []
+
+        if agreement_total is not None:
+            based_on.append("نسخهٔ فعال توافق")
+        if context.get("summaryFacts"):
+            based_on.append("خلاصهٔ تأییدشدهٔ درخواست")
+
+        wants_more_work = any(
+            word in question for word in ("اضافه", "بیشتر", "تعویض هم", "افزایش")
+        )
+        asks_price = any(word in question for word in ("قیمت", "هزینه", "مبلغ"))
+
+        if wants_more_work:
+            answer = (
+                "افزودن کار تازه به این پرونده نیازمند نسخهٔ جدید توافق و تأیید صریح هر "
+                "دو طرف روی همان نسخه است. تا پیش از آن، دامنهٔ پذیرفته‌شده تغییری نمی‌کند."
+            )
+            suggests_change = True
+        elif asks_price and agreement_total is not None:
+            answer = (
+                f"مبلغ کل نسخهٔ فعال توافق {int(agreement_total):,} تومان است. هر تغییری "
+                "در این مبلغ باید با دلیل ثبت و دوباره به تأیید هر دو طرف برسد."
+            )
+            suggests_change = False
+        else:
+            answer = (
+                "بر اساس آنچه در پرونده ثبت شده، پاسخ قطعی به این پرسش ممکن نیست و "
+                "تعیین تکلیف آن به بررسی حضوری در تعمیرگاه نیاز دارد."
+            )
+            unknowns.append("پاسخ این پرسش در سوابق پرونده ثبت نشده است.")
+            suggests_change = False
+
+        return {
+            "answer": f"{answer} ({DEMO_NOTE})",
+            "basedOn": based_on,
+            "unknowns": unknowns,
+            "needsInPersonCheck": bool(unknowns),
+            "suggestsAgreementChange": suggests_change,
+        }
+
     def _build_ExpenseExtraction(self, context: dict[str, Any]) -> dict[str, Any]:
         text = str(context.get("text", ""))
         items: list[dict[str, Any]] = []

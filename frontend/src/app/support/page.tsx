@@ -15,11 +15,31 @@ import {
   Card,
   Empty,
   ErrorNote,
+  Field,
   InfoNote,
   SampleTag,
   Spinner,
   StatusPill,
+  inputClass,
 } from "@/components/ui";
+
+/** What each control is for, so a demo can be driven without the written script. */
+const DEMO_SCENARIOS = [
+  { title: "مسیر کامل", how: "درخواست کلاچ، سه پیشنهاد، انتخاب، توافق، مخارج و پایان." },
+  { title: "افزایش موجه", how: "تغییر توافق با دلیل و شناسهٔ مدرک، سپس دو تأیید." },
+  { title: "افزایش ناموجه", how: "تغییر با دلیل ولی بدون شناسهٔ مدرک؛ مشتری هم می‌پذیرد." },
+  { title: "قطعهٔ مشتری", how: "در اقلام، تأمین‌کننده را مشتری بگذارید تا از سهم متخصص خارج شود." },
+  { title: "bootstrap", how: "با پرچم خاموش، بازپرداخت بدون بررسی قیمتی پذیرفته می‌شود." },
+  { title: "بدون پیشنهاد", how: "درخواست را بدون پیشنهاد رها کنید و ساعت را +۲۵ ساعت ببرید." },
+  { title: "مرجع نمایشی", how: "پرچم را روشن کنید؛ یک پیشنهاد منصفانه باعث رد قیمتی می‌شود." },
+  { title: "کمبود شواهد", how: "اختلاف بدون مدرک ثبت کنید تا دور «تکمیل شواهد» اجرا شود." },
+  { title: "رقابت و دسترسی", how: "پس از پذیرش، متخصص را تعویض کنید و دسترسی قبلی را بیازمایید." },
+  { title: "تکرار مالی", how: "«شکست بعدی درگاه» را صف کنید و انتقال بازپرداخت را دوباره اجرا کنید." },
+  { title: "افزایش در اولین توافق", how: "اولین توافق را گران‌تر از پیشنهاد منتخب ثبت کنید." },
+  { title: "رسید و قیمت ترب", how: "سه قیمت هم‌مبنا ثبت و تأیید کنید، سپس بررسی قیمت را اجرا کنید." },
+  { title: "داوری لازم‌الاجرا", how: "رسید را رد کنید، اختلاف بزنید و پس از پایان اظهارات حکم بخواهید." },
+  { title: "نوبت گذشته", how: "ساعت را از زمان نوبت جلوتر ببرید و انتخاب را بیازمایید." },
+] as const;
 
 function Ratio({
   label,
@@ -56,6 +76,7 @@ export default function SupportPage() {
   const [demo, setDemo] = useState<DemoStateOut | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  const [evidenceNotes, setEvidenceNotes] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
@@ -179,6 +200,19 @@ export default function SupportPage() {
               نمایشی هرگز یک گروه مقایسهٔ واقعی را آماده نمی‌کنند.
             </InfoNote>
           </div>
+
+          <details className="mt-4">
+            <summary className="cursor-pointer text-sm font-medium">
+              سناریوهای قابل اجرا با این کنترل‌ها
+            </summary>
+            <ol className="mt-2 list-inside list-decimal space-y-1 text-xs leading-6 text-ink-700">
+              {DEMO_SCENARIOS.map((scenario) => (
+                <li key={scenario.title}>
+                  <span className="font-semibold">{scenario.title}:</span> {scenario.how}
+                </li>
+              ))}
+            </ol>
+          </details>
         </Card>
       )}
 
@@ -223,6 +257,49 @@ export default function SupportPage() {
                   تعداد اقلام: {dispute.claimItems.length.toLocaleString("fa-IR")} — دور
                   تکمیل شواهد: {dispute.evidenceRoundsUsed.toLocaleString("fa-IR")}
                 </p>
+                {(dispute.supportEvidence ?? []).length > 0 && (
+                  <ul className="mt-2 list-inside list-disc text-xs text-ink-700">
+                    {(dispute.supportEvidence ?? []).map((item, index) => (
+                      <li key={index}>{String(item.note)}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    busy={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        const note = evidenceNotes[dispute.id] ?? "";
+                        await api(`/api/support/disputes/${dispute.id}/evidence`, {
+                          method: "POST",
+                          body: { note, attachmentIds: [] },
+                        });
+                        setEvidenceNotes({ ...evidenceNotes, [dispute.id]: "" });
+                      })
+                    }
+                    disabled={(evidenceNotes[dispute.id] ?? "").trim().length < 3}
+                    data-testid={`evidence-${dispute.id}`}
+                  >
+                    ثبت شاهد تکمیلی
+                  </Button>
+                </div>
+                <div className="mt-2">
+                  <Field label="متن شاهد تکمیلی" htmlFor={`ev-${dispute.id}`}>
+                    <textarea
+                      id={`ev-${dispute.id}`}
+                      rows={2}
+                      className={inputClass}
+                      value={evidenceNotes[dispute.id] ?? ""}
+                      onChange={(event) =>
+                        setEvidenceNotes({
+                          ...evidenceNotes,
+                          [dispute.id]: event.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                </div>
                 {dispute.status === "awaiting_ai" && (
                   <div className="mt-2">
                     <Button

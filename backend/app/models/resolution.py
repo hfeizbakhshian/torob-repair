@@ -68,6 +68,11 @@ class Dispute(Base, TimestampMixin, RevisionMixin):
         DateTime(timezone=True), nullable=True
     )
     evidence_rounds_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    support_evidence: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
+    """Supplementary material support attached while the ruling waited for evidence.
+    Support completes the record; it never issues or rewrites the ruling."""
     budget_extensions_used: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     current_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("dispute_snapshots.id", use_alter=True, name="fk_disputes_current_snapshot"),

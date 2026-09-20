@@ -38,6 +38,7 @@ from app.schemas.api import (
     ExtendBudgetInput,
     MetricsOut,
     ResolveAppealInput,
+    SupportEvidenceInput,
     SupportQueueOut,
     VerifySnapshotInput,
 )
@@ -174,6 +175,24 @@ async def resolve_appeal(
         "id": str(appeal.id),
         "resolvedAt": resolved_at.isoformat() if resolved_at else None,
     }
+
+
+@router.post("/disputes/{dispute_id}/evidence", response_model=DisputeOut)
+async def add_dispute_evidence(
+    dispute_id: uuid.UUID,
+    payload: SupportEvidenceInput,
+    session: SessionDep,
+    support: SupportDep,
+) -> DisputeOut:
+    """Attach supplementary material to a dispute that asked for it."""
+    dispute = await dispute_service.add_support_evidence(
+        session,
+        dispute_id=dispute_id,
+        support_id=support.user_id,
+        note=payload.note,
+        attachment_ids=[str(item) for item in payload.attachment_ids],
+    )
+    return await dispute_out(session, dispute)
 
 
 @router.post("/disputes/{dispute_id}/extend-budget", response_model=DisputeOut)

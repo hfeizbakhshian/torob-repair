@@ -384,15 +384,22 @@ async def start_work(
     if selection.work_started_at is not None:
         return selection
 
+    request = await lock_row(session, Request, selection.request_id)
     agreement = await active_agreement(session, selection_id)
     if agreement is None:
         raise invalid_state("پیش از شروع کار، توافق باید به تأیید هر دو طرف برسد.")
     if selection.scheduled_at > now():
         raise invalid_state("نوبت تأییدشده هنوز فرا نرسیده است.")
+    if request.visit_window_end is not None and now() > request.visit_window_end:
+        # Starting later inside the agreed appointment is fine; starting after the whole
+        # visit window has passed needs a fresh appointment both sides approve.
+        raise invalid_state(
+            "بازهٔ مراجعهٔ این درخواست گذشته است؛ برای شروع، نوبت تازه باید در نسخهٔ "
+            "توافق به تأیید هر دو طرف برسد."
+        )
 
     selection.work_started_at = now()
     selection.bump()
-    request = await lock_row(session, Request, selection.request_id)
     request.status = RequestStatus.in_progress
     request.bump()
 

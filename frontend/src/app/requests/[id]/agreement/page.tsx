@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, tehranTime, toman, type AgreementOut, type LineItem } from "@/lib/api";
+import { CaseAssistant } from "@/components/case-assistant";
 import { LineItems, Totals } from "@/components/line-items";
 import { activeAgreement, loadCase, pendingAgreement, type CaseBundle } from "@/lib/case";
 import {
@@ -121,6 +122,10 @@ export default function AgreementPage() {
       </InfoNote>
 
       {!selection && <Empty>هنوز همکاری پذیرفته‌شده‌ای برای این پرونده وجود ندارد.</Empty>}
+
+      {selection && selection.status === "accepted" && (
+        <CaseAssistant selectionId={selection.id} />
+      )}
 
       {agreements.length === 0 && selection && (
         <Empty>هنوز نسخه‌ای از توافق ثبت نشده است.</Empty>

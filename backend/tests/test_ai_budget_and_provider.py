@@ -430,3 +430,74 @@ async def test_mock_provider_labels_every_answer_as_a_demo_response() -> None:
     assert response.ok
     assert "نمایشی" in response.payload["note"]
     assert response.usage.is_estimated is True
+
+
+async def test_the_shared_stage_quota_is_not_doubled_by_the_second_person(
+    session, policy, advance
+):
+    """Customer and selected specialist draw on one allowance, not one each."""
+    from app.domain import ai_flows
+    from app.domain.ai_service import AiService
+    from app.providers.ai.mock import MockAiProvider
+
+    request = await factories.published_request(session, policy)
+    await factories.submit_offer(session, policy, request, "specialist-arya")
+    selection = await factories.accepted_collaboration(
+        session, policy, request, "specialist-arya"
+    )
+    await factories.activate_agreement(session, policy, request, selection)
+    await session.commit()
+
+    service = AiService(MockAiProvider(), policy)
+    asked = 0
+    for index in range(4):
+        actor = request.customer_id if index % 2 == 0 else selection.specialist_id
+        try:
+            outcome = await ai_flows.answer_case_question(
+                service,
+                selection_id=selection.id,
+                actor_id=actor,
+                question=f"پرسش نمونهٔ شمارهٔ {index}",
+            )
+        except DomainError as error:
+            assert error.code is ErrorCode.QUOTA_EXCEEDED
+            break
+        assert outcome.ok
+        asked += 1
+
+    # Three turns for the stage in total, shared between the two people.
+    assert asked == policy.ai.stages["specialist"].max_turns
+
+    await session.close()
+    runs = list(
+        (
+            await session.execute(
+                select(AiRun).where(
+                    AiRun.request_id == request.id, AiRun.stage == AiStage.specialist
+                )
+            )
+        ).scalars()
+    )
+    actors = {run.actor_id for run in runs}
+    assert len(actors) == 2  # both people really did use the same bucket
+
+
+async def test_a_stranger_cannot_use_the_shared_stage(session, policy, advance):
+    from app.domain import ai_flows
+    from app.domain.ai_service import AiService
+    from app.providers.ai.mock import MockAiProvider
+
+    request = await factories.published_request(session, policy)
+    await factories.submit_offer(session, policy, request, "specialist-arya")
+    selection = await factories.accepted_collaboration(
+        session, policy, request, "specialist-arya"
+    )
+    await session.commit()
+
+    other = await factories.user(session, "specialist-behnam")
+    service = AiService(MockAiProvider(), policy)
+    with pytest.raises(DomainError) as error:
+        await ai_flows.answer_case_question(
+            service, selection_id=selection.id, actor_id=other.id, question="سلام"
+        )
+    assert error.value.code is ErrorCode.FORBIDDEN

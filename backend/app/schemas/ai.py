@@ -57,6 +57,22 @@ class RequestSummary(ApiModel):
     note: str | None = Field(default=None, max_length=MAX_REASON_CHARS)
 
 
+class CaseGuidance(ApiModel):
+    """An answer to one question from the customer or the selected specialist.
+
+    It explains what the case record already says. It never changes an amount, approves
+    anything on someone's behalf, or turns an unknown into a diagnosis.
+    """
+
+    answer: str = Field(min_length=1, max_length=900)
+    based_on: list[str] = Field(default_factory=list, max_length=10)
+    """Short labels for the parts of the case the answer rests on."""
+    unknowns: list[str] = Field(default_factory=list, max_length=10)
+    needs_in_person_check: bool = False
+    suggests_agreement_change: bool = False
+    """At most a suggestion: any change still needs a new version and two approvals."""
+
+
 class ExtractedExpenseLine(ApiModel):
     source_text: str = Field(min_length=1, max_length=400)
     title: str = Field(min_length=1, max_length=200)

@@ -20,6 +20,7 @@ from app.schemas.api import (
     AiRunOut,
     AiUsageOut,
     AnswersInput,
+    CaseQuestionInput,
     ExtractExpensesInput,
 )
 
@@ -87,6 +88,31 @@ async def explain_comparison(
     await session.commit()
     outcome = await ai_flows.explain_comparison(
         ai, request_id=request_id, actor_id=customer.user_id
+    )
+    return _to_out(outcome)
+
+
+@router.post("/selections/{selection_id}/ai/ask", response_model=AiRunOut)
+async def ask_about_case(
+    selection_id: uuid.UUID,
+    payload: CaseQuestionInput,
+    session: SessionDep,
+    user: UserDep,
+    ai: AiDep,
+) -> AiRunOut:
+    """Stage two: the assistant shared by the customer and the selected specialist.
+
+    Both draw on one quota, so the second person does not double the allowance.
+    """
+    selection = await session.get(Selection, selection_id)
+    if selection is None:
+        raise not_found("همکاری پیدا نشد.")
+    await session.commit()
+    outcome = await ai_flows.answer_case_question(
+        ai,
+        selection_id=selection_id,
+        actor_id=user.user_id,
+        question=payload.question,
     )
     return _to_out(outcome)
 

@@ -20,10 +20,11 @@ from app.db import session_scope
 from app.domain import audit
 from app.domain import evaluation as evaluation_service
 from app.domain import requests as request_service
+from app.domain.agreements import active_agreement
 from app.domain.ai_service import AiOutcome, AiService
 from app.domain.demo_control import is_demo_reference_ready
 from app.domain.disputes import build_snapshot, validate_decision
-from app.domain.errors import DomainError, invalid_state, not_found
+from app.domain.errors import DomainError, forbidden, invalid_state, not_found
 from app.domain.policy_service import load_policy
 from app.domain.reference import build_snapshot as build_reference_snapshot
 from app.domain.reference import group_key
@@ -50,8 +51,10 @@ from app.models.enums import (
     FairnessVerdict,
     Party,
     RefundReason,
+    SelectionStatus,
 )
 from app.schemas.ai import (
+    CaseGuidance,
     ClarifyQuestions,
     DisputeDecisionOutput,
     EvaluationResult,
@@ -158,6 +161,58 @@ async def _mark_stale(session: Any, run_id: uuid.UUID) -> None:
     run = await session.get(AiRun, run_id)
     if run is not None:
         run.status = AiRunStatus.stale
+
+
+async def answer_case_question(
+    service: AiService,
+    *,
+    selection_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    question: str,
+) -> AiOutcome:
+    """Stage two: the assistant shared by the customer and the selected specialist.
+
+    The quota is shared between them, so a second person does not double the allowance,
+    and replacing a specialist does not reset it. The answer explains the case record; it
+    never changes an amount, approves anything, or invents a diagnosis.
+    """
+    async with session_scope() as session:
+        selection = await session.get(Selection, selection_id)
+        if selection is None:
+            raise not_found("همکاری پیدا نشد.")
+        request = await session.get(Request, selection.request_id)
+        if request is None:
+            raise not_found("پرونده پیدا نشد.")
+        if actor_id not in (request.customer_id, selection.specialist_id):
+            raise forbidden("این گفتگو فقط برای مشتری و متخصص منتخب همین پرونده است.")
+        if selection.status is not SelectionStatus.accepted:
+            raise invalid_state("این گفتگو فقط در همکاری جاری فعال است.")
+
+        version = await request_service.current_version(session, request)
+        agreement = await active_agreement(session, selection_id)
+        context = {
+            "question": question[:1000],
+            "serviceCode": version.service_code,
+            "vehicleCode": version.vehicle_code,
+            "summaryFacts": version.summary_facts,
+            "summaryUnknowns": version.summary_unknowns,
+            "agreementTotalToman": agreement.total_toman if agreement else None,
+            "agreementLines": agreement.lines if agreement else [],
+            "scheduledAt": selection.scheduled_at.isoformat(),
+        }
+        key = _version_key("case", selection_id, agreement.id if agreement else "none")
+        request_id = request.id
+
+    return await service.run(
+        purpose=AiPurpose.case_guidance,
+        stage=AiStage.specialist,
+        output_model=CaseGuidance,
+        context=context,
+        request_id=request_id,
+        actor_id=actor_id,
+        input_version_key=key,
+        thinking=False,
+    )
 
 
 async def extract_expenses(

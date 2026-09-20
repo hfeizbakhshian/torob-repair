@@ -1021,6 +1021,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/selections/{selection_id}/ai/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask About Case
+         * @description Stage two: the assistant shared by the customer and the selected specialist.
+         *
+         *     Both draw on one quota, so the second person does not double the allowance.
+         */
+        post: operations["ask_about_case_api_selections__selection_id__ai_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/selections/{selection_id}/ai/extract-expenses": {
         parameters: {
             query?: never;
@@ -1225,6 +1247,26 @@ export interface paths {
          *     acting person. Support never overrides an applied settlement.
          */
         post: operations["resolve_appeal_api_support_appeals__appeal_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/disputes/{dispute_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Dispute Evidence
+         * @description Attach supplementary material to a dispute that asked for it.
+         */
+        post: operations["add_dispute_evidence_api_support_disputes__dispute_id__evidence_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1503,6 +1545,11 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** CaseQuestionInput */
+        CaseQuestionInput: {
+            /** Question */
+            question: string;
+        };
         /** ClaimItemInput */
         ClaimItemInput: {
             /** Claimitemid */
@@ -1712,6 +1759,10 @@ export interface components {
                 [key: string]: unknown;
             }[];
             status: components["schemas"]["DisputeStatus"];
+            /** Supportevidence */
+            supportEvidence?: {
+                [key: string]: unknown;
+            }[];
         };
         /**
          * DisputeStatus
@@ -2663,6 +2714,13 @@ export interface components {
             validUntil: string;
             /** Warrantynote */
             warrantyNote?: string | null;
+        };
+        /** SupportEvidenceInput */
+        SupportEvidenceInput: {
+            /** Attachmentids */
+            attachmentIds?: string[];
+            /** Note */
+            note: string;
         };
         /** SupportQueueOut */
         SupportQueueOut: {
@@ -7434,6 +7492,86 @@ export interface operations {
             };
         };
     };
+    ask_about_case_api_selections__selection_id__ai_ask_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                selection_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseQuestionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiRunOut"];
+                };
+            };
+            /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description NOT_FOUND — مورد خواسته‌شده وجود ندارد */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VERSION_CONFLICT یا INVALID_STATE */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VALIDATION_ERROR — ورودی معتبر نیست */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description QUOTA_EXCEEDED — سقف مصرف پر شده است */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description SERVICE_UNAVAILABLE — سرویس در دسترس نیست */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     extract_expenses_api_selections__selection_id__ai_extract_expenses_post: {
         parameters: {
             query?: never;
@@ -8394,6 +8532,86 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description NOT_FOUND — مورد خواسته‌شده وجود ندارد */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VERSION_CONFLICT یا INVALID_STATE */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VALIDATION_ERROR — ورودی معتبر نیست */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description QUOTA_EXCEEDED — سقف مصرف پر شده است */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description SERVICE_UNAVAILABLE — سرویس در دسترس نیست */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_dispute_evidence_api_support_disputes__dispute_id__evidence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dispute_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupportEvidenceInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeOut"];
                 };
             };
             /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */

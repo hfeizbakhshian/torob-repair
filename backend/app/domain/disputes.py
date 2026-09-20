@@ -499,6 +499,9 @@ async def build_snapshot(
     for statement in statements:
         # Only ids that already exist in the case become citable evidence.
         evidence |= {str(item) for item in statement.evidence_ids}
+    for item in dispute.support_evidence:
+        evidence.add(str(item["id"]))
+        evidence |= {str(attachment) for attachment in item.get("attachmentIds", [])}
     evidence_ids = sorted(evidence)
 
     disputed_ids = [str(item.get("claimItemId")) for item in dispute.claim_items]
@@ -537,6 +540,9 @@ async def build_snapshot(
             for statement in statements
         ],
         "respondedParties": [statement.party.value for statement in statements],
+        "supportEvidence": [
+            {"id": item["id"], "note": item["note"]} for item in dispute.support_evidence
+        ],
         "evidenceIds": evidence_ids,
         "workStarted": selection.work_started_at is not None,
     }
@@ -726,6 +732,54 @@ async def apply_decision(
         },
     )
     return settlement
+
+
+async def add_support_evidence(
+    session: AsyncSession,
+    *,
+    dispute_id: uuid.UUID,
+    support_id: uuid.UUID,
+    note: str,
+    attachment_ids: list[str],
+) -> Dispute:
+    """Support completes the record while the ruling waits for evidence.
+
+    This is the spec's support role and its limit: support fills gaps in the material and
+    never issues, rewrites or overrides the ruling. Adding evidence expires the frozen
+    input, so the next round sees the completed record rather than the old one.
+    """
+    dispute = await lock_row(session, Dispute, dispute_id)
+    if dispute.status not in (
+        DisputeStatus.needs_evidence,
+        DisputeStatus.awaiting_ai,
+        DisputeStatus.dispute_open,
+    ):
+        raise invalid_state("تکمیل شواهد فقط تا پیش از صدور حکم ممکن است.")
+    if not note:
+        raise validation_error("متن شاهد تکمیلی الزامی است.", note="متن الزامی است.")
+
+    dispute.support_evidence = [
+        *dispute.support_evidence,
+        {
+            "id": f"support-{uuid.uuid4().hex[:12]}",
+            "at": now().isoformat(),
+            "note": note[:2000],
+            "attachmentIds": attachment_ids,
+        },
+    ]
+    dispute.bump()
+    await _expire_snapshots(session, dispute)
+
+    await audit.record(
+        session,
+        "dispute_support_evidence_added",
+        request_id=dispute.request_id,
+        actor_id=support_id,
+        actor_role="support",
+        subject_id=dispute.id,
+        reason=note[:400],
+    )
+    return dispute
 
 
 async def extend_budget(

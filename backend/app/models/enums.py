@@ -190,6 +190,7 @@ class AiStage(StrEnum):
 class AiPurpose(StrEnum):
     clarify_questions = "clarify_questions"
     request_summary = "request_summary"
+    case_guidance = "case_guidance"
     comparison_explanation = "comparison_explanation"
     expense_extraction = "expense_extraction"
     final_evaluation = "final_evaluation"

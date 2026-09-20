@@ -597,3 +597,42 @@ async def test_redrafting_at_or_below_the_base_needs_no_reason(session, policy):
     )
     await session.commit()
     assert lowered.status is AgreementStatus.proposed
+
+
+async def test_work_cannot_start_after_the_visit_window_has_passed(
+    session, policy, advance
+):
+    """Starting later in the agreed appointment is fine; after the window it is not."""
+    request = await factories.published_request(session, policy)
+    await factories.submit_offer(session, policy, request, "specialist-arya")
+    selection = await factories.accepted_collaboration(
+        session, policy, request, "specialist-arya"
+    )
+    await factories.activate_agreement(session, policy, request, selection)
+
+    # The appointment is two days after the 24-hour deadline; a few hours past it is
+    # still the same appointment, so starting then works.
+    advance(days=3, hours=4)
+    started = await agreement_service.start_work(
+        session, selection_id=selection.id, actor_id=selection.specialist_id,
+        expected_revision=None,
+    )
+    await session.commit()
+    assert started.work_started_at is not None
+
+
+async def test_starting_after_the_window_needs_a_new_appointment(session, policy, advance):
+    request = await factories.published_request(session, policy)
+    await factories.submit_offer(session, policy, request, "specialist-arya")
+    selection = await factories.accepted_collaboration(
+        session, policy, request, "specialist-arya"
+    )
+    await factories.activate_agreement(session, policy, request, selection)
+
+    advance(days=10)  # past the 7-day visit window
+    with pytest.raises(DomainError) as error:
+        await agreement_service.start_work(
+            session, selection_id=selection.id, actor_id=selection.specialist_id,
+            expected_revision=None,
+        )
+    assert "بازهٔ مراجعه" in error.value.message

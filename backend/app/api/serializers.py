@@ -392,6 +392,7 @@ async def dispute_out(session: AsyncSession, dispute: Dispute) -> DisputeOut:
         customer_closed_statements_at=dispute.customer_closed_statements_at,
         specialist_closed_statements_at=dispute.specialist_closed_statements_at,
         evidence_rounds_used=dispute.evidence_rounds_used,
+        support_evidence=dispute.support_evidence,
         resolved_at=dispute.resolved_at,
         statements=[
             {
