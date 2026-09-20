@@ -233,6 +233,22 @@ async def pay_registration_fee(
     if succeeded is not None:
         return succeeded
 
+    # An Idempotency-Key is global. Replaying it for the same request returns the same
+    # payment; reusing it for a different one is a client mistake and must produce the
+    # documented validation error rather than a constraint violation.
+    reused = (
+        await session.execute(
+            select(Payment).where(Payment.idempotency_key == idempotency_key)
+        )
+    ).scalar_one_or_none()
+    if reused is not None:
+        if reused.request_id != request_id or reused.customer_id != customer_id:
+            raise validation_error(
+                "این کلید تکرار قبلاً برای پرداخت دیگری استفاده شده است.",
+                idempotencyKey="کلید تکراری با محتوای متفاوت",
+            )
+        return reused
+
     version = await current_version(session, request)
     policy_row = await ensure_active_policy(session)
     key = group_key(

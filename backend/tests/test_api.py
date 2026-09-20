@@ -272,3 +272,108 @@ async def test_openapi_document_is_served(client: AsyncClient):
     document = (await client.get("/api/openapi.json")).json()
     assert document["info"]["version"] == "0.1.0"
     assert "/api/requests" in document["paths"]
+
+
+async def _new_request(client: AsyncClient) -> str:
+    created = await client.post(
+        "/api/requests",
+        json={
+            "city": "تهران",
+            "district": "تهرانسر",
+            "vehicleCode": factories.VEHICLE,
+            "serviceCode": factories.CLUTCH,
+            "symptoms": "نمونه",
+        },
+    )
+    assert created.status_code == 201, created.text
+    return str(created.json()["id"])
+
+
+async def test_replaying_an_idempotency_key_returns_the_same_payment(client: AsyncClient):
+    await sign_in(client, "customer-sahar")
+    request_id = await _new_request(client)
+
+    first = await client.post(
+        f"/api/requests/{request_id}/pay",
+        json={"idempotencyKey": "replay-1"},
+        headers={"Idempotency-Key": "replay-1"},
+    )
+    again = await client.post(
+        f"/api/requests/{request_id}/pay",
+        json={"idempotencyKey": "replay-1"},
+        headers={"Idempotency-Key": "replay-1"},
+    )
+    assert first.status_code == 200
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
+
+
+async def test_reusing_a_key_for_another_request_is_a_clean_validation_error(
+    client: AsyncClient,
+):
+    """It must never surface as a database constraint violation."""
+    await sign_in(client, "customer-sahar")
+    first_id = await _new_request(client)
+    second_id = await _new_request(client)
+
+    ok = await client.post(
+        f"/api/requests/{first_id}/pay",
+        json={"idempotencyKey": "shared-key"},
+        headers={"Idempotency-Key": "shared-key"},
+    )
+    assert ok.status_code == 200
+
+    clash = await client.post(
+        f"/api/requests/{second_id}/pay",
+        json={"idempotencyKey": "shared-key"},
+        headers={"Idempotency-Key": "shared-key"},
+    )
+    assert clash.status_code == 422
+    body = clash.json()
+    assert body["code"] == "VALIDATION_ERROR"
+    assert "idempotencyKey" in (body.get("fieldErrors") or {})
+
+
+async def test_session_survives_a_failed_request(client: AsyncClient):
+    """A request that errors must not poison the session for the next one."""
+    await sign_in(client, "customer-sahar")
+    first_id = await _new_request(client)
+    await client.post(
+        f"/api/requests/{first_id}/pay",
+        json={"idempotencyKey": "poison-key"},
+        headers={"Idempotency-Key": "poison-key"},
+    )
+    second_id = await _new_request(client)
+    clash = await client.post(
+        f"/api/requests/{second_id}/pay",
+        json={"idempotencyKey": "poison-key"},
+        headers={"Idempotency-Key": "poison-key"},
+    )
+    assert clash.status_code == 422
+
+    # Still signed in, and still able to read and write afterwards.
+    assert (await client.get("/api/auth/me")).json() is not None
+    third_id = await _new_request(client)
+    healthy = await client.post(
+        f"/api/requests/{third_id}/pay",
+        json={"idempotencyKey": "healthy-key"},
+        headers={"Idempotency-Key": "healthy-key"},
+    )
+    assert healthy.status_code == 200
+    assert healthy.json()["status"] == "succeeded"
+
+
+async def test_moving_the_demo_clock_does_not_sign_anyone_out(client: AsyncClient):
+    """Product deadlines follow the injected clock; session lifetime follows real time.
+
+    Otherwise advancing time to reach a 24-hour deadline would end every demo session.
+    """
+    await sign_in(client, "support-mina")
+    advanced = await client.post(
+        "/api/demo/advance-clock", json={"seconds": 60 * 60 * 24 * 5}
+    )
+    assert advanced.status_code == 200
+
+    still_signed_in = await client.get("/api/auth/me")
+    assert still_signed_in.json() is not None
+    assert (await client.get("/api/support/queue")).status_code == 200

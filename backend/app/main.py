@@ -26,6 +26,7 @@ from app.api.routes import (
     requests,
     support,
 )
+from app.api.unit_of_work import UnitOfWorkMiddleware
 from app.config import settings
 from app.db import dispose, session_scope
 from app.domain.demo_control import load_clock_offset
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )
+    app.add_middleware(UnitOfWorkMiddleware)
     errors.install(app)
 
     app.include_router(auth.router, prefix="/api")

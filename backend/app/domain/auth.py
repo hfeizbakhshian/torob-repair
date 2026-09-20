@@ -10,18 +10,27 @@ import hashlib
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.clock import now
 from app.config import settings
 from app.domain.errors import forbidden, not_found
 from app.models import Session, SpecialistProfile, User
 from app.models.enums import Role
 
 TOKEN_BYTES = 32
+
+
+def real_now() -> datetime:
+    """Wall-clock UTC, deliberately ignoring the demo clock offset.
+
+    Every product deadline is measured against the injected clock, but a session's
+    lifetime is infrastructure. If it followed the demo clock, moving time forward to
+    reach a 24-hour or 48-hour deadline would sign everyone out mid-demo.
+    """
+    return datetime.now(UTC)
 
 
 def hash_token(raw_token: str) -> str:
@@ -77,7 +86,7 @@ async def sign_in(session: AsyncSession, login_key: str) -> tuple[Session, str]:
     record = Session(
         user_id=user.id,
         token_hash=hash_token(raw_token),
-        expires_at=now() + timedelta(hours=settings.session_ttl_hours),
+        expires_at=real_now() + timedelta(hours=settings.session_ttl_hours),
     )
     session.add(record)
     await session.flush()
@@ -99,7 +108,7 @@ async def resolve(session: AsyncSession, raw_token: str | None) -> Principal | N
         return None
 
     record, user = row
-    if record.revoked_at is not None or record.expires_at <= now() or not user.is_active:
+    if record.revoked_at is not None or record.expires_at <= real_now() or not user.is_active:
         return None
     return Principal(
         user_id=user.id,
@@ -112,7 +121,7 @@ async def resolve(session: AsyncSession, raw_token: str | None) -> Principal | N
 async def sign_out(session: AsyncSession, session_id: uuid.UUID) -> None:
     record = await session.get(Session, session_id)
     if record is not None and record.revoked_at is None:
-        record.revoked_at = now()
+        record.revoked_at = real_now()
 
 
 async def specialist_profile(

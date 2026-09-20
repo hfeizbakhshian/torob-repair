@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.unit_of_work import session_from
 from app.config import settings
-from app.db import get_session
 from app.domain import auth
 from app.domain.ai_service import AiService, build_provider
 from app.domain.auth import Principal
@@ -21,9 +20,13 @@ from app.policy import Policy
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
-async def db_session() -> AsyncIterator[AsyncSession]:
-    async for session in get_session():
-        yield session
+def db_session(request: Request) -> AsyncSession:
+    """The session the unit-of-work middleware opened for this request.
+
+    The commit happens there, before the response is returned, so a client that acts on
+    the result immediately always sees its own write.
+    """
+    return session_from(request)
 
 
 SessionDep = Annotated[AsyncSession, Depends(db_session)]
