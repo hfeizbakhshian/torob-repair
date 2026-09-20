@@ -11,8 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.clock import now
 from app.domain import (
     agreements as agreement_service,
+)
+from app.domain import (
     offers as offer_service,
+)
+from app.domain import (
     requests as request_service,
+)
+from app.domain import (
     selection as selection_service,
 )
 from app.domain.auth import specialist_profile

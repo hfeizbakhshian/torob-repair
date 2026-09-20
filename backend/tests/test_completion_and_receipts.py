@@ -8,11 +8,13 @@ import pytest
 from sqlalchemy import select
 
 from app.clock import now
-from app.domain import agreements as agreement_service, expenses as service, parts
+from app.domain import agreements as agreement_service
+from app.domain import expenses as service
+from app.domain import parts
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.money import LineItem
-from app.models import Attachment, ExpenseVersion, PartPriceSnapshot, Request
-from app.models.enums import Party, PartSourceKind, PriceCheckVerdict, ReceiptStatus, RequestStatus
+from app.models import Attachment, Request
+from app.models.enums import Party, PriceCheckVerdict, ReceiptStatus, RequestStatus
 from tests import factories
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
@@ -238,7 +240,7 @@ async def test_customer_part_stays_out_of_the_specialist_payable_end_to_end(
     session, policy, advance
 ):
     lines = factories.clutch_lines(part_supplied_by="customer")
-    request, selection = await started_case(session, policy, advance, lines=lines)
+    _, selection = await started_case(session, policy, advance, lines=lines)
     agreement = await agreement_service.active_agreement(session, selection.id)
     assert agreement is not None
     assert agreement.total_toman == 5_400_000

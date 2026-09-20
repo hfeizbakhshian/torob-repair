@@ -10,7 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.clock import now
-from app.domain import agreements as agreement_service, selection as selection_service
+from app.domain import agreements as agreement_service
+from app.domain import selection as selection_service
 from app.domain.errors import DomainError, ErrorCode
 from app.models import AgreementVersion, Approval, Offer, OfferVersion, Request, Selection
 from app.models.enums import (
@@ -100,7 +101,7 @@ async def test_only_one_selection_survives_two_concurrent_attempts(session, poli
                 )
                 await s.commit()
                 return True
-            except Exception:
+            except Exception:  # noqa: BLE001 - the loser of the race is expected to fail
                 await s.rollback()
                 return False
 

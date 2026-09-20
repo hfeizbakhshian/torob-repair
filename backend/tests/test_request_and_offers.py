@@ -8,7 +8,8 @@ import pytest
 from sqlalchemy import select
 
 from app.clock import now
-from app.domain import offers as offer_service, requests as request_service
+from app.domain import offers as offer_service
+from app.domain import requests as request_service
 from app.domain.auth import specialist_profile
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.money import LineItem

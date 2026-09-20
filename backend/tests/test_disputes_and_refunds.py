@@ -7,10 +7,20 @@ from sqlalchemy import select
 
 from app.domain import (
     agreements as agreement_service,
+)
+from app.domain import (
     ai_flows,
+)
+from app.domain import (
     disputes as service,
+)
+from app.domain import (
     evaluation as evaluation_service,
+)
+from app.domain import (
     expenses as expense_service,
+)
+from app.domain import (
     refunds as refund_service,
 )
 from app.domain.ai_service import AiService
@@ -189,7 +199,7 @@ async def test_ruling_applies_without_re_confirmation_and_only_once(
 async def test_settlement_amount_is_computed_by_code_not_by_the_model(
     session, policy, advance, ai
 ):
-    request, selection, agreement, dispute = await disputed_case(session, policy, advance)
+    _, _, agreement, dispute = await disputed_case(session, policy, advance)
     advance(hours=25)
     await session.commit()
     await ai_flows.adjudicate_dispute(ai, dispute_id=dispute.id, allow_evidence_round=False)
@@ -356,7 +366,7 @@ async def test_one_approval_does_not_apply_a_settlement(session, policy, advance
 
 
 async def test_late_ruling_on_an_expired_snapshot_is_refused(session, policy, advance):
-    request, selection, _, dispute = await disputed_case(session, policy, advance)
+    request, _, _, dispute = await disputed_case(session, policy, advance)
     advance(hours=25)
     snapshot = await service.build_snapshot(session, dispute, round_number=1)
     await session.commit()

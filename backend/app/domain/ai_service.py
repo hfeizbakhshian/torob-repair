@@ -21,7 +21,7 @@ from datetime import date
 from typing import Any, TypeVar
 
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import now
@@ -144,23 +144,47 @@ class AiService:
         )
         return int(normal or 0), int(attempts or 0)
 
-    async def _successful_turns(
+    async def _occupied_turns(
         self, session: AsyncSession, request_id: uuid.UUID | None, stage: AiStage
     ) -> int:
+        """Turns already used, counting the ones still in flight.
+
+        A call that has been reserved but not yet settled holds its slot, so several
+        simultaneous requests cannot each see an empty stage and all get through. A run
+        that ends up failing releases the slot, because it never becomes a successful turn.
+        """
         count = await session.scalar(
             select(func.count())
             .select_from(AiRun)
             .where(
                 AiRun.request_id == request_id,
                 AiRun.stage == stage,
-                AiRun.counts_as_successful_turn.is_(True),
+                AiRun.attempt == 1,
+                (AiRun.counts_as_successful_turn.is_(True))
+                | (AiRun.status == AiRunStatus.reserved),
             )
         )
         return int(count or 0)
 
+    @staticmethod
+    async def _lock_bucket(session: AsyncSession, key: str) -> None:
+        """Serialise reservations for one budget bucket.
+
+        The lock is transaction-scoped, so it is released when the reservation commits —
+        well before the network call, which never holds a database lock.
+        """
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": key}
+        )
+
+    @staticmethod
+    def _is_live() -> bool:
+        """Only a configured live installation spends money and needs the cap."""
+        return settings.ai_mode == "live"
+
     async def _check_daily_cap(self, session: AsyncSession) -> None:
         """Whole-installation live spend cap, covering every case, appeal and retry."""
-        if self.provider.name == "mock":
+        if not self._is_live():
             return
         cap = settings.ai_daily_cost_cap_toman
         if cap <= 0:
@@ -177,7 +201,7 @@ class AiService:
             )
 
     def _rates(self) -> tuple[int | None, int | None]:
-        if self.provider.name == "mock":
+        if not self._is_live():
             return None, None
         return (
             settings.ai_input_price_per_million,
@@ -210,6 +234,7 @@ class AiService:
     ) -> tuple[uuid.UUID, int, bool]:
         """Take the hold in its own committed transaction, before any network call."""
         async with session_scope() as session:
+            await self._lock_bucket(session, f"{request_id}:{stage.value}:{scope}")
             await self._check_daily_cap(session)
 
             reserve_in, estimated = estimate_tokens(messages, self.policy)
@@ -224,7 +249,7 @@ class AiService:
 
             if scope == "case":
                 quota = self.policy.ai.stages[stage.value]
-                turns = await self._successful_turns(session, request_id, stage)
+                turns = await self._occupied_turns(session, request_id, stage)
                 if attempt == 1 and turns >= quota.max_turns:
                     raise quota_exceeded(
                         "سهمیهٔ نوبت‌های این مرحله تمام شده است. توافق، مشاهدهٔ پیشنهاد "
@@ -320,7 +345,7 @@ class AiService:
                 # An unknown usage figure keeps the hold: it is not zero.
                 reservation.unresolved = usage_unknown
 
-            if cost and self.provider.name != "mock":
+            if cost and self._is_live():
                 today = date.today().isoformat()
                 row = (
                     await session.execute(
