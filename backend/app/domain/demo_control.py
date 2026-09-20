@@ -44,6 +44,8 @@ async def _set(session: AsyncSession, key: str, value: dict[str, Any]) -> None:
         session.add(DemoSetting(key=key, value=value))
     else:
         row.value = value
+    # Autoflush is off, so a read later in this same request would not see the change.
+    await session.flush()
 
 
 async def load_clock_offset(session: AsyncSession) -> timedelta:

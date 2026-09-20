@@ -377,3 +377,15 @@ async def test_moving_the_demo_clock_does_not_sign_anyone_out(client: AsyncClien
     still_signed_in = await client.get("/api/auth/me")
     assert still_signed_in.json() is not None
     assert (await client.get("/api/support/queue")).status_code == 200
+
+
+async def test_demo_flag_is_visible_immediately_after_setting_it(client: AsyncClient):
+    await sign_in(client, "support-mina")
+    enabled = await client.post("/api/demo/reference-ready", json={"enabled": True})
+    assert enabled.status_code == 200
+    # The same response must already reflect the change, not the previous value.
+    assert enabled.json()["demoReferenceReady"] is True
+    assert (await client.get("/api/demo/state")).json()["demoReferenceReady"] is True
+
+    disabled = await client.post("/api/demo/reference-ready", json={"enabled": False})
+    assert disabled.json()["demoReferenceReady"] is False

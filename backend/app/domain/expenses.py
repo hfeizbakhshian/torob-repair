@@ -84,8 +84,10 @@ async def submit_expense_version(
     selection, request = await _load_collaboration(session, selection_id)
     if selection.specialist_id != specialist_id:
         raise forbidden("ثبت مخارج بر عهدهٔ متخصص منتخب است.")
-    if selection.status not in (SelectionStatus.accepted, SelectionStatus.ended):
-        raise invalid_state("برای ثبت مخارج، همکاری باید پذیرفته شده باشد.")
+    if selection.status is not SelectionStatus.accepted:
+        raise invalid_state(
+            "ثبت مخارج فقط در همکاری جاری ممکن است؛ همکاری پایان‌یافته مدرک تازه نمی‌پذیرد."
+        )
 
     require_unique_ids(lines)
     expense = await get_or_create_expense(session, selection_id)

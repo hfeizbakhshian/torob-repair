@@ -21,6 +21,7 @@ from app.domain import audit
 from app.domain import evaluation as evaluation_service
 from app.domain import requests as request_service
 from app.domain.ai_service import AiOutcome, AiService
+from app.domain.demo_control import is_demo_reference_ready
 from app.domain.disputes import build_snapshot, validate_decision
 from app.domain.errors import DomainError, invalid_state, not_found
 from app.domain.policy_service import load_policy
@@ -287,7 +288,12 @@ async def review_refund_price(service: AiService, *, refund_id: uuid.UUID) -> Ai
         }
         request_id = request.id
         no_candidates = not candidates
-        reference_ready = reference.is_ready
+        # A group backed only by demo rows is never "ready" — that flag stays false in the
+        # stored snapshot. The demo switch lets the data-driven *scenario* run anyway, and
+        # the decision records that its basis was sample data.
+        demo_basis = await is_demo_reference_ready(session)
+        reference_ready = reference.is_ready or (demo_basis and reference.case_count > 0)
+        sample_basis = demo_basis and not reference.is_ready
 
     if no_candidates:
         async with session_scope() as session:
@@ -367,13 +373,18 @@ async def review_refund_price(service: AiService, *, refund_id: uuid.UUID) -> Ai
             if item["wasSelectable"]
         }
 
+        basis_note = (
+            " مبنای این بررسی دادهٔ نمونهٔ دمو است و مرجع واقعی بازار نیست."
+            if sample_basis
+            else ""
+        )
         if any(finding.verdict is FairnessVerdict.fair for finding in review.findings):
             await refund_service.reject(
                 session,
                 refund_id=refund_id,
                 note=(
                     "حداقل یک پیشنهاد معتبر و منصفانه برای این درخواست وجود داشت، "
-                    "بنابراین بازپرداخت قیمتی برقرار نیست."
+                    "بنابراین بازپرداخت قیمتی برقرار نیست." + basis_note
                 ),
                 policy=await load_policy(session, refund.policy_version_id),
             )
@@ -384,7 +395,9 @@ async def review_refund_price(service: AiService, *, refund_id: uuid.UUID) -> Ai
                 session,
                 refund_id=refund_id,
                 reason=RefundReason.price_complaint,
-                note="هیچ پیشنهاد معتبر و منصفانه‌ای برای این درخواست احراز نشد.",
+                note=(
+                    "هیچ پیشنهاد معتبر و منصفانه‌ای برای این درخواست احراز نشد." + basis_note
+                ),
             )
         else:
             # Unreviewed offers may never be ignored, whatever the reason.
