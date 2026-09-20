@@ -16,7 +16,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import now
-from app.domain import audit, jobs, offers as offers_service
+from app.domain import audit, jobs
+from app.domain import offers as offers_service
 from app.domain.errors import forbidden, invalid_state, not_found
 from app.models import Offer, OfferVersion, Payment, Refund, Request
 from app.models.enums import (
@@ -154,11 +155,18 @@ async def _decide(
     )
     had_selectable = any(item["wasSelectable"] for item in refund.offers_snapshot)
 
-    if request.close_reason is not None and request.status is RequestStatus.cancelled:
-        if not request.published_at:
-            return await _approve(
-                session, refund, RefundReason.abandoned_before_publish, "پرونده پیش از انتشار رها شد."
-            )
+    abandoned = (
+        request.status is RequestStatus.cancelled
+        and request.close_reason is not None
+        and request.published_at is None
+    )
+    if abandoned:
+        return await _approve(
+            session,
+            refund,
+            RefundReason.abandoned_before_publish,
+            "پرونده پیش از انتشار رها شد.",
+        )
 
     if deadline_passed and never_selected and not had_selectable:
         return await _approve(

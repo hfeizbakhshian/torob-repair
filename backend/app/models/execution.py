@@ -30,8 +30,8 @@ from app.models.base import (
     uuid_pk,
 )
 from app.models.enums import (
-    Party,
     PartSourceKind,
+    Party,
     PriceCheckVerdict,
     ReceiptStatus,
 )

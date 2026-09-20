@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import now
 from app.domain import audit, jobs
-from app.domain.errors import forbidden, invalid_state, not_found
+from app.domain.errors import forbidden, invalid_state
 from app.domain.money import LineItem, compute_totals, require_unique_ids
 from app.models import (
     AgreementVersion,

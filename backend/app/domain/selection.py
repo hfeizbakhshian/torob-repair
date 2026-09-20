@@ -9,7 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import now
-from app.domain import audit, jobs, offers as offers_service
+from app.domain import audit, jobs
+from app.domain import offers as offers_service
 from app.domain.errors import forbidden, invalid_state, not_found
 from app.models import (
     AgreementVersion,

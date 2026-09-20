@@ -190,7 +190,7 @@ async def review_receipt(
     """
     version = await lock_row(session, ExpenseVersion, expense_version_id)
     expense = await lock_row(session, Expense, version.expense_id)
-    selection, request = await _load_collaboration(session, expense.selection_id)
+    _, request = await _load_collaboration(session, expense.selection_id)
     if request.customer_id != customer_id:
         raise forbidden("تأیید رسید بر عهدهٔ مشتری همین پرونده است.")
     if version.submitted_at is None:
@@ -499,7 +499,7 @@ async def report_mismatch(
     reason: str,
 ) -> Completion:
     """The customer disagrees with the invoice. Nothing about the receipts is rewritten."""
-    selection, request = await _load_collaboration(session, selection_id)
+    _, request = await _load_collaboration(session, selection_id)
     if request.customer_id != customer_id:
         raise forbidden("گزارش مغایرت بر عهدهٔ مشتری همین پرونده است.")
     completion = (

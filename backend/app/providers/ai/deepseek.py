@@ -137,7 +137,7 @@ class DeepSeekProvider:
                 usage=AiUsage(is_estimated=False),
                 latency_ms=int((time.perf_counter() - started) * 1000),
             )
-        except Exception as error:  # noqa: BLE001 - reported, never silently retried
+        except Exception as error:
             return AiResponse(
                 error_code="network_error",
                 error_detail=type(error).__name__,

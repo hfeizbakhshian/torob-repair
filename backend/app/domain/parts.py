@@ -25,7 +25,7 @@ from app.models import (
     PartPriceSnapshot,
     Request,
 )
-from app.models.enums import LineType, Party, PartSourceKind, PriceCheckVerdict
+from app.models.enums import LineType, PartSourceKind, Party, PriceCheckVerdict
 from app.policy import Policy
 from app.repository.locking import lock_row
 

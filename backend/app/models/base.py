@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from sqlalchemy import BigInteger, DateTime, Integer, MetaData, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -28,7 +28,7 @@ MAX_SAFE_INT = 9_007_199_254_740_991
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
-    type_annotation_map = {
+    type_annotation_map: ClassVar[dict[Any, Any]] = {
         dict[str, Any]: JSONB,
         list[Any]: JSONB,
     }
