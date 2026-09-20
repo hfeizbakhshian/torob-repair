@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
+from app.config import settings
 from app.db import get_sessionmaker
 
 STATE_KEY = "db_session"
@@ -31,6 +32,11 @@ class UnitOfWorkMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         async with get_sessionmaker()() as session:
             setattr(request.state, STATE_KEY, session)
+            if settings.is_demo:
+                # The worker may also be moving the demo clock; pick up its position.
+                from app.domain.demo_control import refresh_clock_offset
+
+                await refresh_clock_offset(session)
             try:
                 response = await call_next(request)
             except Exception:

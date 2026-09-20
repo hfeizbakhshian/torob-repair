@@ -406,7 +406,7 @@ async def _apply_settlement(
 
 
 async def build_snapshot(
-    session: AsyncSession, dispute: Dispute, *, round_number: int
+    session: AsyncSession, dispute: Dispute, *, round_number: int | None = None
 ) -> DisputeSnapshot:
     """Freeze exactly what the model is allowed to see.
 
@@ -414,6 +414,19 @@ async def build_snapshot(
     status, and the evidence list is the only set of ids a ruling may cite. Image content
     is never sent — only the text items and their confirmation state.
     """
+    if round_number is None:
+        # Numbered per snapshot taken, not per evidence round: a retry after a technical
+        # failure freezes the input again and must not collide with the earlier attempt.
+        round_number = (
+            await session.scalar(
+                select(DisputeSnapshot.round_number)
+                .where(DisputeSnapshot.dispute_id == dispute.id)
+                .order_by(DisputeSnapshot.round_number.desc())
+                .limit(1)
+            )
+            or 0
+        ) + 1
+
     request = await session.get(Request, dispute.request_id)
     selection = await session.get(Selection, dispute.selection_id)
     if request is None or selection is None:
@@ -709,6 +722,61 @@ async def apply_decision(
         },
     )
     return settlement
+
+
+async def extend_budget(
+    session: AsyncSession,
+    *,
+    dispute_id: uuid.UUID,
+    support_id: uuid.UUID,
+    reason: str,
+    policy: Policy,
+) -> Dispute:
+    """Support grants this dispute one more go at its own operational budget.
+
+    Allowed at most once, only after the automatic work stopped, and only with a recorded
+    reason. The earlier runs stay on record; their holds simply stop counting against the
+    cap. A party asking again never extends anything, and the installation-wide daily
+    spend cap still applies.
+    """
+    dispute = await lock_row(session, Dispute, dispute_id)
+    if dispute.status is not DisputeStatus.awaiting_ai:
+        raise invalid_state("تمدید بودجه فقط برای پروندهٔ متوقف‌شده ممکن است.")
+    if dispute.budget_extensions_used >= policy.ai.dispute_budget_extensions:
+        raise invalid_state("بودجهٔ این اختلاف قبلاً یک بار تمدید شده است.")
+    if not reason:
+        raise validation_error("ثبت دلیل تمدید الزامی است.", reason="دلیل الزامی است.")
+
+    from app.models import AiRun, BudgetReservation
+
+    holds = (
+        await session.execute(
+            select(BudgetReservation)
+            .join(AiRun, AiRun.id == BudgetReservation.ai_run_id)
+            .where(
+                BudgetReservation.scope == "operations",
+                BudgetReservation.scope_key == f"dispute:{dispute_id}",
+                BudgetReservation.released_at.is_(None),
+            )
+        )
+    ).scalars()
+    for hold in holds:
+        hold.released_at = now()
+
+    dispute.budget_extensions_used += 1
+    dispute.status = DisputeStatus.reviewing
+    dispute.bump()
+
+    await audit.record(
+        session,
+        "dispute_budget_extended",
+        request_id=dispute.request_id,
+        actor_id=support_id,
+        actor_role="support",
+        subject_id=dispute.id,
+        reason=reason,
+    )
+    return dispute
 
 
 async def can_enter_adjudication(dispute: Dispute) -> bool:

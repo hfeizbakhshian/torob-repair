@@ -1352,6 +1352,22 @@
         "title": "ExpenseVersionOut",
         "type": "object"
       },
+      "ExtendBudgetInput": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 600,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ExtendBudgetInput",
+        "type": "object"
+      },
       "ExtractExpensesInput": {
         "additionalProperties": false,
         "properties": {
@@ -11305,6 +11321,110 @@
           }
         },
         "summary": "Resolve Appeal",
+        "tags": [
+          "support"
+        ]
+      }
+    },
+    "/api/support/disputes/{dispute_id}/extend-budget": {
+      "post": {
+        "description": "One extra allowance of the dispute's own operational budget, with a reason.\n\nSupport completes evidence and unblocks the process; it never issues or rewrites the\nruling itself.",
+        "operationId": "extend_dispute_budget_api_support_disputes__dispute_id__extend_budget_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dispute_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dispute Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendBudgetInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisputeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_FOUND — مورد خواسته‌شده وجود ندارد"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VERSION_CONFLICT یا INVALID_STATE"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR — ورودی معتبر نیست"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "QUOTA_EXCEEDED — سقف مصرف پر شده است"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "SERVICE_UNAVAILABLE — سرویس در دسترس نیست"
+          }
+        },
+        "summary": "Extend Dispute Budget",
         "tags": [
           "support"
         ]

@@ -6,6 +6,7 @@ Nothing here touches the system clock or any file outside the project.
 
 from __future__ import annotations
 
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -50,7 +51,28 @@ async def load_clock_offset(session: AsyncSession) -> timedelta:
     seconds = float(stored["seconds"]) if stored else 0.0
     offset = timedelta(seconds=seconds)
     clock.set_offset(offset)
+    global _last_refresh
+    _last_refresh = time.monotonic()
     return offset
+
+
+_last_refresh = 0.0
+REFRESH_INTERVAL_SECONDS = 2.0
+
+
+async def refresh_clock_offset(session: AsyncSession, *, force: bool = False) -> None:
+    """Re-read the demo clock from the database.
+
+    The offset is shared state: the API process moves it, and the worker has to see the
+    move or a deadline that has "passed" for the UI would never fire. Each process
+    re-reads it at most every couple of seconds rather than on every single request.
+    """
+    if not settings.is_demo:
+        return
+    now = time.monotonic()
+    if not force and (now - _last_refresh) < REFRESH_INTERVAL_SECONDS:
+        return
+    await load_clock_offset(session)
 
 
 async def advance_clock(session: AsyncSession, delta: timedelta) -> timedelta:

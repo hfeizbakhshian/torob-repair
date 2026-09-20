@@ -681,3 +681,61 @@ async def test_only_one_appeal_per_evaluation(session, policy, advance, ai):
             session, evaluation_id=evaluation.id, specialist_id=selection.specialist_id,
             reason="دوم", evidence_note=None, policy=policy,
         )
+
+
+async def test_exhausted_dispute_budget_parks_the_case_for_support(
+    session, policy, advance, monkeypatch
+):
+    """No ruling is invented when the operational budget runs out."""
+    from app.domain import ai_service as ai_service_module
+    from app.domain.errors import quota_exceeded
+
+    _, _, _, dispute = await disputed_case(session, policy, advance)
+    advance(hours=25)
+    await session.commit()
+
+    async def refuse(*args, **kwargs):
+        raise quota_exceeded("سقف بودجهٔ عملیاتی این پرونده پر شده است.")
+
+    monkeypatch.setattr(ai_service_module.AiService, "run", refuse)
+    service = AiService(MockAiProvider(), DEFAULT_POLICY)
+    await ai_flows.adjudicate_dispute(service, dispute_id=dispute.id)
+    await session.close()
+
+    parked = await session.get(Dispute, dispute.id)
+    assert parked.status is DisputeStatus.awaiting_ai
+    settlements = list((await session.execute(select(Settlement))).scalars())
+    assert settlements == []
+
+
+async def test_support_may_extend_the_dispute_budget_once(session, policy, advance):
+    _, _, _, dispute = await disputed_case(session, policy, advance)
+    dispute.status = DisputeStatus.awaiting_ai
+    await session.commit()
+
+    support = await factories.support_user(session)
+    extended = await service.extend_budget(
+        session, dispute_id=dispute.id, support_id=support.id,
+        reason="علت شکست فنی رفع شد", policy=policy,
+    )
+    await session.commit()
+    assert extended.budget_extensions_used == 1
+    assert extended.status is DisputeStatus.reviewing
+
+    extended.status = DisputeStatus.awaiting_ai
+    await session.commit()
+    with pytest.raises(DomainError, match="یک بار"):
+        await service.extend_budget(
+            session, dispute_id=dispute.id, support_id=support.id,
+            reason="بار دوم", policy=policy,
+        )
+
+
+async def test_extending_requires_a_parked_dispute_and_a_reason(session, policy, advance):
+    _, _, _, dispute = await disputed_case(session, policy, advance)
+    support = await factories.support_user(session)
+    with pytest.raises(DomainError, match="متوقف‌شده"):
+        await service.extend_budget(
+            session, dispute_id=dispute.id, support_id=support.id,
+            reason="زود است", policy=policy,
+        )

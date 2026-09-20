@@ -36,7 +36,7 @@ from app.domain import (
     selection as selection_service,
 )
 from app.domain.ai_service import AiService, build_provider
-from app.domain.demo_control import load_clock_offset
+from app.domain.demo_control import load_clock_offset, refresh_clock_offset
 from app.domain.disputes import can_enter_adjudication
 from app.domain.policy_service import load_policy
 from app.models import Attachment, Dispute, Job, Request, Selection
@@ -217,6 +217,9 @@ async def tick(ai: AiService) -> int:
     """One polling round. Returns how many jobs were processed."""
     processed = 0
     async with session_scope() as session:
+        # The demo clock lives in the database; the API moves it, so re-read it before
+        # deciding which jobs are due.
+        await refresh_clock_offset(session, force=True)
         await reclaim_expired_leases(session)
 
     while True:

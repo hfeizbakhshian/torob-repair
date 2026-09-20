@@ -1231,6 +1231,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/support/disputes/{dispute_id}/extend-budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend Dispute Budget
+         * @description One extra allowance of the dispute's own operational budget, with a reason.
+         *
+         *     Support completes evidence and unblocks the process; it never issues or rewrites the
+         *     ruling itself.
+         */
+        post: operations["extend_dispute_budget_api_support_disputes__dispute_id__extend_budget_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/support/evaluations/{request_id}": {
         parameters: {
             query?: never;
@@ -1776,6 +1799,11 @@ export interface components {
             totalToman: number | null;
             /** Versionnumber */
             versionNumber: number;
+        };
+        /** ExtendBudgetInput */
+        ExtendBudgetInput: {
+            /** Reason */
+            reason: string;
         };
         /** ExtractExpensesInput */
         ExtractExpensesInput: {
@@ -8361,6 +8389,86 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description NOT_FOUND — مورد خواسته‌شده وجود ندارد */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VERSION_CONFLICT یا INVALID_STATE */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VALIDATION_ERROR — ورودی معتبر نیست */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description QUOTA_EXCEEDED — سقف مصرف پر شده است */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description SERVICE_UNAVAILABLE — سرویس در دسترس نیست */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    extend_dispute_budget_api_support_disputes__dispute_id__extend_budget_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dispute_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendBudgetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeOut"];
                 };
             };
             /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */

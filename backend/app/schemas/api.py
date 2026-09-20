@@ -583,6 +583,10 @@ class AppealInput(ApiModel):
     evidence_note: str | None = Field(default=None, max_length=600)
 
 
+class ExtendBudgetInput(ApiModel):
+    reason: str = Field(min_length=1, max_length=600)
+
+
 class ResolveAppealInput(ApiModel):
     note: str = Field(min_length=1, max_length=600)
     new_verdicts: list[dict[str, Any]] | None = None

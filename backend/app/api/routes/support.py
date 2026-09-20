@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 
 from app.api.deps import PolicyDep, SessionDep, SupportDep
 from app.api.serializers import dispute_out, evaluation_out, price_snapshot_out, refund_out
+from app.domain import disputes as dispute_service
 from app.domain import evaluation as evaluation_service
 from app.domain import parts as parts_service
 from app.domain.errors import not_found
@@ -32,7 +33,9 @@ from app.models.enums import (
     RequestStatus,
 )
 from app.schemas.api import (
+    DisputeOut,
     EvaluationOut,
+    ExtendBudgetInput,
     MetricsOut,
     ResolveAppealInput,
     SupportQueueOut,
@@ -171,6 +174,29 @@ async def resolve_appeal(
         "id": str(appeal.id),
         "resolvedAt": resolved_at.isoformat() if resolved_at else None,
     }
+
+
+@router.post("/disputes/{dispute_id}/extend-budget", response_model=DisputeOut)
+async def extend_dispute_budget(
+    dispute_id: uuid.UUID,
+    payload: ExtendBudgetInput,
+    session: SessionDep,
+    support: SupportDep,
+    policy: PolicyDep,
+) -> DisputeOut:
+    """One extra allowance of the dispute's own operational budget, with a reason.
+
+    Support completes evidence and unblocks the process; it never issues or rewrites the
+    ruling itself.
+    """
+    dispute = await dispute_service.extend_budget(
+        session,
+        dispute_id=dispute_id,
+        support_id=support.user_id,
+        reason=payload.reason,
+        policy=policy,
+    )
+    return await dispute_out(session, dispute)
 
 
 @router.get("/metrics", response_model=MetricsOut)

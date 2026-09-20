@@ -22,7 +22,7 @@ from app.domain import evaluation as evaluation_service
 from app.domain import requests as request_service
 from app.domain.ai_service import AiOutcome, AiService
 from app.domain.disputes import build_snapshot, validate_decision
-from app.domain.errors import invalid_state, not_found
+from app.domain.errors import DomainError, invalid_state, not_found
 from app.domain.policy_service import load_policy
 from app.domain.reference import build_snapshot as build_reference_snapshot
 from app.domain.reference import group_key
@@ -417,8 +417,7 @@ async def adjudicate_dispute(
         ):
             return None
 
-        round_number = dispute.evidence_rounds_used + 1
-        snapshot = await build_snapshot(session, dispute, round_number=round_number)
+        snapshot = await build_snapshot(session, dispute)
         dispute.status = DisputeStatus.reviewing
         dispute.bump()
         snapshot_id = snapshot.id
@@ -431,19 +430,38 @@ async def adjudicate_dispute(
         }
         policy = await load_policy(session, None)
 
-    outcome = await service.run(
-        purpose=AiPurpose.dispute_adjudication,
-        stage=AiStage.operations,
-        output_model=DisputeDecisionOutput,
-        context=context,
-        request_id=request_id,
-        input_version_key=_version_key("dispute", dispute_id, snapshot_id),
-        thinking=True,
-        scope="operations",
-        scope_key=f"dispute:{dispute_id}",
-        counts_as_turn=False,
-        max_output_tokens=policy.ai.operations_max_output_per_call,
-    )
+    try:
+        outcome = await service.run(
+            purpose=AiPurpose.dispute_adjudication,
+            stage=AiStage.operations,
+            output_model=DisputeDecisionOutput,
+            context=context,
+            request_id=request_id,
+            input_version_key=_version_key("dispute", dispute_id, snapshot_id),
+            thinking=True,
+            scope="operations",
+            scope_key=f"dispute:{dispute_id}",
+            counts_as_turn=False,
+            max_output_tokens=policy.ai.operations_max_output_per_call,
+        )
+    except DomainError as budget_error:
+        # The operational budget for this dispute is spent. Automatic work stops and the
+        # case waits for support, which may extend the same budget once. Neither party
+        # re-requesting it extends anything, and no ruling is invented.
+        async with session_scope() as session:
+            dispute = await session.get(Dispute, dispute_id)
+            if dispute is not None:
+                dispute.status = DisputeStatus.awaiting_ai
+                dispute.bump()
+                await audit.record(
+                    session,
+                    "dispute_awaiting_ai",
+                    request_id=dispute.request_id,
+                    actor_role="system",
+                    subject_id=dispute.id,
+                    reason=budget_error.code.value,
+                )
+        return None
 
     async with session_scope() as session:
         dispute = await session.get(Dispute, dispute_id)
