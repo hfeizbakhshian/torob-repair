@@ -120,19 +120,33 @@ async def propose_version(
         pending.status = AgreementStatus.superseded
         pending.bump()
 
-    is_first = previous_active is None and pending is None
-    if not is_first and not change_reason:
-        raise invalid_state("هر تغییر توافق باید دلیل ثبت‌شده داشته باشد.")
-
     base_offer_version_id: uuid.UUID | None = None
     expires_at = now() + timedelta(hours=policy.timing.agreement_draft_validity_hours)
+    offer_version = await session.get(OfferVersion, selection.offer_version_id)
     if previous_active is None:
         # The very first agreement is anchored to the selected offer version, which is
         # where the price-change evaluation chain starts.
         base_offer_version_id = selection.offer_version_id
-        offer_version = await session.get(OfferVersion, selection.offer_version_id)
         if offer_version is not None:
             expires_at = min(expires_at, offer_version.valid_until)
+
+    # A reason is required for any change to an agreement already in force, and for any
+    # increase above the base — including the very first agreement, where an unexplained
+    # jump from the selected offer is exactly what the evaluation has to catch.
+    base_total = (
+        previous_active.total_toman
+        if previous_active is not None
+        else (offer_version.total_toman if offer_version is not None else None)
+    )
+    is_increase = (
+        base_total is not None
+        and totals.total_toman is not None
+        and totals.total_toman > base_total
+    )
+    if (previous_active is not None or is_increase) and not change_reason:
+        raise invalid_state(
+            "تغییر توافق فعال یا افزایش مبلغ نسبت به مبنا باید دلیل ثبت‌شده داشته باشد."
+        )
 
     if scheduled_at <= now():
         raise invalid_state("زمان مراجعهٔ توافق باید در آینده باشد.")

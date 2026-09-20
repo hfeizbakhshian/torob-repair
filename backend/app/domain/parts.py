@@ -241,7 +241,18 @@ async def evaluate_invoice_price(
     payer = Party.customer if line.supplied_by is Party.customer else Party.specialist
     policy_row_id = (await session.get(Request, request_id)).policy_version_id
 
-    def _store(
+    existing_event = (
+        await session.execute(
+            select(PartPriceCheck).where(
+                PartPriceCheck.request_id == request_id,
+                PartPriceCheck.line_id == line.id,
+                PartPriceCheck.verdict == PriceCheckVerdict.overpriced,
+                PartPriceCheck.established_at.is_not(None),
+            )
+        )
+    ).scalar_one_or_none()
+
+    async def _store(
         verdict: PriceCheckVerdict,
         *,
         median: int | None,
@@ -250,7 +261,26 @@ async def evaluate_invoice_price(
         note: str | None,
         snapshot_ids: list[str],
     ) -> PartPriceCheck:
-        version_number = 1
+        # Re-running the check produces a new version and supersedes the previous one,
+        # but an already-established overprice event is never written — or counted — twice.
+        is_event = verdict is PriceCheckVerdict.overpriced and established
+        if existing_event is not None and is_event:
+            return existing_event
+
+        previous = list(
+            (
+                await session.execute(
+                    select(PartPriceCheck).where(
+                        PartPriceCheck.expense_version_id == expense_version_id,
+                        PartPriceCheck.line_id == line.id,
+                    )
+                )
+            ).scalars()
+        )
+        for row in previous:
+            row.is_superseded = True
+        version_number = max((row.version_number for row in previous), default=0) + 1
+
         check = PartPriceCheck(
             request_id=request_id,
             expense_version_id=expense_version_id,
@@ -265,14 +295,14 @@ async def evaluate_invoice_price(
             verdict=verdict,
             payer=payer,
             policy_version_id=policy_row_id,
-            established_at=now() if (established and verdict is not
-                                     PriceCheckVerdict.not_assessable) else None,
+            established_at=now() if is_event else None,
         )
         session.add(check)
+        await session.flush()
         return check
 
     if line.type is not LineType.part or line.supplied_by is Party.customer:
-        return _store(
+        return await _store(
             PriceCheckVerdict.not_assessable,
             median=None,
             ratio=None,
@@ -285,7 +315,7 @@ async def evaluate_invoice_price(
     if unit_price is None and line.amount_toman is not None and line.quantity:
         unit_price = line.amount_toman // line.quantity
     if unit_price is None:
-        return _store(
+        return await _store(
             PriceCheckVerdict.not_assessable,
             median=None,
             ratio=None,
@@ -316,7 +346,7 @@ async def evaluate_invoice_price(
     sellers = {snapshot.seller_name for snapshot in usable}
 
     if len(sellers) < policy.price.invoice_min_reference_sellers:
-        return _store(
+        return await _store(
             PriceCheckVerdict.not_assessable,
             median=None,
             ratio=None,
@@ -331,7 +361,7 @@ async def evaluate_invoice_price(
     median = _median([snapshot.unit_price_toman for snapshot in usable])
     ratio = Decimal(unit_price) / Decimal(median) if median else None
     overpriced = ratio is not None and ratio > policy.price.invoice_overprice_factor
-    check = _store(
+    check = await _store(
         PriceCheckVerdict.overpriced if overpriced else PriceCheckVerdict.within_range,
         median=median,
         ratio=ratio,
@@ -339,9 +369,8 @@ async def evaluate_invoice_price(
         note=None,
         snapshot_ids=[str(snapshot.id) for snapshot in usable],
     )
-    await session.flush()
 
-    if overpriced and check.established_at is not None:
+    if overpriced and check.established_at is not None and existing_event is None:
         await audit.record(
             session,
             "invoice_overprice",

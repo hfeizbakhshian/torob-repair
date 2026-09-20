@@ -200,7 +200,7 @@ async def activate_agreement(
     selection: Selection,
     *,
     lines: list[LineItem] | None = None,
-    change_reason: str | None = None,
+    change_reason: str | None = "ثبت توافق بر مبنای پیشنهاد منتخب (نمونه)",
     evidence_ids: list[str] | None = None,
 ) -> Any:
     agreement = await agreement_service.propose_version(
@@ -212,7 +212,7 @@ async def activate_agreement(
         scheduled_at=selection.scheduled_at,
         warranty_note="ضمانت نمونهٔ ۶ ماهه",
         change_reason=change_reason,
-        evidence_ids=evidence_ids or [],
+        evidence_ids=evidence_ids or ["ev-sample"],
         policy=policy,
     )
     await session.commit()
