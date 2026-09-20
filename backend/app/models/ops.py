@@ -271,3 +271,16 @@ class IdempotencyRecord(Base, TimestampMixin):
     status_code: Mapped[int] = mapped_column(Integer, default=200, nullable=False)
 
     __table_args__ = (UniqueConstraint("scope", "key", "user_id", name="uq_idempotency_scope_key"),)
+
+
+class DemoSetting(Base, TimestampMixin):
+    """Durable demo-control state: the injected clock offset and the demo scenario flags.
+
+    Kept in the database so restarting the server does not silently rewind the demo.
+    """
+
+    __tablename__ = "demo_settings"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    key: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
