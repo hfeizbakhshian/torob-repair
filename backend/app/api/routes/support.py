@@ -166,7 +166,11 @@ async def resolve_appeal(
         note=payload.note,
         new_verdicts=payload.new_verdicts,
     )
-    return {"id": str(appeal.id), "resolvedAt": appeal.resolved_at.isoformat()}
+    resolved_at = appeal.resolved_at
+    return {
+        "id": str(appeal.id),
+        "resolvedAt": resolved_at.isoformat() if resolved_at else None,
+    }
 
 
 @router.get("/metrics", response_model=MetricsOut)
@@ -240,15 +244,17 @@ async def metrics(session: SessionDep, _: SupportDep, policy: PolicyDep) -> Metr
         if item.has_unjustified_increase or item.has_invoice_overprice
     ]
 
-    satisfaction = list(
-        (
+    satisfaction: list[int] = [
+        score
+        for score in (
             await session.execute(
                 select(Completion.satisfaction_score).where(
                     Completion.satisfaction_score.is_not(None)
                 )
             )
         ).scalars()
-    )
+        if score is not None
+    ]
 
     closed_requests = [
         request.id
@@ -261,19 +267,21 @@ async def metrics(session: SessionDep, _: SupportDep, policy: PolicyDep) -> Metr
             RequestStatus.closed_unselected,
         )
     ]
-    token_rows = list(
-        (
-            await session.execute(
-                select(
-                    AiRun.request_id,
-                    func.sum(func.coalesce(AiRun.actual_input_tokens, 0)),
+    token_totals: list[float] = []
+    if closed_requests:
+        token_rows = list(
+            (
+                await session.execute(
+                    select(
+                        AiRun.request_id,
+                        func.sum(func.coalesce(AiRun.actual_input_tokens, 0)),
+                    )
+                    .where(AiRun.request_id.in_(closed_requests))
+                    .group_by(AiRun.request_id)
                 )
-                .where(AiRun.request_id.in_(closed_requests) if closed_requests else False)
-                .group_by(AiRun.request_id)
-            )
-        ).all()
-    )
-    token_totals = [float(total) for _, total in token_rows]
+            ).all()
+        )
+        token_totals = [float(total or 0) for _, total in token_rows]
 
     disputes = list((await session.execute(select(Dispute))).scalars())
     decided_hours = [

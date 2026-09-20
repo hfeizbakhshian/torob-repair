@@ -13,6 +13,7 @@ from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import now
 from app.db import session_scope
@@ -131,10 +132,11 @@ async def summarise_request(
     summary = RequestSummary.model_validate(outcome.payload)
     async with session_scope() as session:
         request = await request_service.get_request(session, request_id)
-        version = await session.get(RequestVersion, version_id)
-        if version is None or request.current_version_id != version_id:
+        stored = await session.get(RequestVersion, version_id)
+        if stored is None or request.current_version_id != version_id:
             await _mark_stale(session, outcome.run_id)
             raise invalid_state("نسخهٔ درخواست تغییر کرده است؛ پاسخ قبلی اعمال نشد.")
+        version = stored
 
         version.summary_facts = summary.facts
         version.summary_unknowns = summary.unknowns
@@ -447,11 +449,12 @@ async def adjudicate_dispute(
         dispute = await session.get(Dispute, dispute_id)
         if dispute is None:
             return outcome
-        snapshot = await session.get(DisputeSnapshot, snapshot_id)
-        if snapshot is None or snapshot.expired_at is not None:
+        current = await session.get(DisputeSnapshot, snapshot_id)
+        if current is None or current.expired_at is not None:
             # The parties changed the input, or settled, while the model was thinking.
             await _mark_stale(session, outcome.run_id)
             return outcome
+        snapshot = current
 
         if not outcome.ok:
             dispute.status = DisputeStatus.awaiting_ai
@@ -568,7 +571,9 @@ async def explain_comparison(
     )
 
 
-async def current_expense_version(session: Any, selection_id: uuid.UUID) -> ExpenseVersion | None:
+async def current_expense_version(
+    session: AsyncSession, selection_id: uuid.UUID
+) -> ExpenseVersion | None:
     expense = (
         await session.execute(select(Expense).where(Expense.selection_id == selection_id))
     ).scalar_one_or_none()

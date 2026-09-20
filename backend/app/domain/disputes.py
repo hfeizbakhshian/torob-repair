@@ -603,7 +603,7 @@ def settlement_lines_from(
         if decision.accepted_amount_toman <= 0:
             continue
         base = agreement_lines.get(decision.claim_item_id, {})
-        claim = next(
+        claim: dict[str, Any] = next(
             (
                 item
                 for item in snapshot.payload["claimItems"]

@@ -247,8 +247,9 @@ async def score_for(
         if evaluation.has_unjustified_increase or evaluation.has_invoice_overprice
     ]
 
-    satisfaction_rows = list(
-        (
+    satisfaction_rows: list[int] = [
+        score
+        for score in (
             await session.execute(
                 select(Completion.satisfaction_score)
                 .join(Selection, Selection.id == Completion.selection_id)
@@ -258,7 +259,8 @@ async def score_for(
                 )
             )
         ).scalars()
-    )
+        if score is not None
+    ]
 
     total = len(assessable)
     enough = total >= policy.score.min_cases_for_number

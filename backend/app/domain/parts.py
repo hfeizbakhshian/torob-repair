@@ -239,7 +239,10 @@ async def evaluate_invoice_price(
         raise invalid_state("این نسخهٔ مخارج به پرونده‌ای متصل نیست.")
 
     payer = Party.customer if line.supplied_by is Party.customer else Party.specialist
-    policy_row_id = (await session.get(Request, request_id)).policy_version_id
+    request_row = await session.get(Request, request_id)
+    if request_row is None:
+        raise invalid_state("پروندهٔ این بررسی پیدا نشد.")
+    policy_row_id = request_row.policy_version_id
 
     existing_event = (
         await session.execute(

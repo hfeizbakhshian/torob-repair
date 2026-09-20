@@ -8,6 +8,7 @@ score is never rendered as a bare number without its denominator.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -481,7 +482,8 @@ async def visible_agreement(
     ).scalar_one_or_none()
 
 
-def deadline_seconds_left(deadline: object) -> float | None:
+def deadline_seconds_left(deadline: datetime | None) -> float | None:
+    """How long is left, never negative. `None` means there is no such deadline."""
     if deadline is None:
         return None
-    return max(0.0, (deadline - now()).total_seconds())  # type: ignore[operator]
+    return max(0.0, (deadline - now()).total_seconds())
