@@ -71,6 +71,12 @@ async def session(engine: object) -> AsyncIterator[AsyncSession]:
         await session.commit()
 
 
+@pytest.fixture(autouse=True)
+def isolated_attachment_dir(tmp_path, monkeypatch):
+    """Uploads go to a per-test temporary directory, never the demo file store."""
+    monkeypatch.setattr(settings, "attachment_dir", tmp_path / "attachments")
+
+
 @pytest.fixture
 def policy() -> Policy:
     return DEFAULT_POLICY

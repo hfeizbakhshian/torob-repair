@@ -202,19 +202,21 @@ class MockAiProvider:
             else:
                 facts.append(f"{key}: {value}")
 
-        if service == "cooling_system_diagnosis":
+        if service not in _QUESTIONS_BY_SERVICE:
+            # Outside the sample templates there is nothing to price from.
+            suggested = "diagnostic"
+            needs_check = True
+            unknowns.append("این خدمت در قالب‌های نمونه نیست و نیاز به بررسی حضوری دارد.")
+        elif service == "cooling_system_diagnosis":
             suggested = "diagnostic"
             needs_check = True
             unknowns.append("علت دقیق داغ‌کردن پیش از بررسی حضوری معلوم نیست.")
         elif service == "clutch_kit_replacement" and answers.get("symptom_slip") == "گاهی":
             suggested = "conditional"
             needs_check = False
-        elif service:
+        else:
             suggested = "fixed"
             needs_check = False
-        else:
-            suggested = "diagnostic"
-            needs_check = True
 
         return {
             "facts": facts or ["اطلاعات ثبت‌شده برای ساخت خلاصه کافی نبود."],

@@ -167,7 +167,8 @@ export default function SpecialistPage() {
           <div className="flex flex-col gap-4">
             {requests.map((request) => {
               const draft = drafts[request.id] ?? defaultDraft(request);
-              const mine = offers.find((offer) => offer.version && offer.id && request.id);
+              // Only an offer on *this* request counts as already submitted.
+              const mine = offers.find((offer) => offer.requestId === request.id);
               const selection = selections[request.id] ?? null;
               return (
                 <div key={request.id} className="rounded-lg border border-ink-200 p-3">

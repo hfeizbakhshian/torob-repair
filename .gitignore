@@ -24,3 +24,5 @@ out/
 # Editor / OS
 .DS_Store
 *.swp
+/frontend/test-results/
+/frontend/playwright-report/

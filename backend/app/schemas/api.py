@@ -244,6 +244,7 @@ class SpecialistPublicOut(ApiModel):
 
 class OfferOut(ApiModel):
     id: uuid.UUID
+    request_id: uuid.UUID
     status: OfferStatus
     revision: int
     specialist: SpecialistPublicOut

@@ -451,6 +451,12 @@ async def cancel_collaboration(
         request.closed_at = now()
     request.bump()
 
+    # A cancellation never creates a positive sample, but an already-established
+    # negative cause on this case still has to be aggregated.
+    from app.domain.evaluation import queue_for_closed_case
+
+    await queue_for_closed_case(session, request=request, selection=selection)
+
     await audit.record(
         session,
         "collaboration_cancelled",

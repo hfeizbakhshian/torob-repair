@@ -474,6 +474,11 @@ async def confirm_completion(
     request.closed_at = now()
     request.bump()
 
+    # Closing the case is what starts the score aggregation for this collaboration.
+    from app.domain.evaluation import queue_for_closed_case
+
+    await queue_for_closed_case(session, request=request, selection=selection)
+
     await audit.record(
         session,
         "completion_confirmed",

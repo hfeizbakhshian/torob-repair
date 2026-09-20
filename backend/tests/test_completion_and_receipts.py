@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 
 import pytest
@@ -287,8 +288,11 @@ async def test_attachment_type_is_sniffed_and_duplicates_are_flagged(
 
     path = settings.attachment_dir / stored.stored_name
     assert path.exists()
-    # Random stored name, outside anything the web server publishes.
-    assert stored.original_name not in stored.stored_name
+    # The stored name is random and reveals nothing about what was uploaded, and the file
+    # lives outside anything the web server publishes.
+    assert re.fullmatch(r"[0-9a-f]{32}\.png", stored.stored_name)
+    assert stored.original_name == "a.png"
+    assert settings.attachment_dir.is_absolute()
 
 
 async def test_fourth_attachment_is_refused(session, policy, advance):

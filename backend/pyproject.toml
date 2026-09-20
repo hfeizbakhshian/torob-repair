@@ -35,6 +35,8 @@ packages = ["app"]
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+# Alembic writes these; they are reviewed as diffs, not reformatted by hand.
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "BLE", "SIM", "C4", "RUF"]
@@ -50,6 +52,10 @@ disallow_untyped_decorators = false
 [[tool.mypy.overrides]]
 module = ["langchain_deepseek.*", "langchain_core.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["alembic.*"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -153,6 +153,7 @@ async def offer_out(
     selectable, reason = offers_service.is_version_selectable(version, offer, request)
     return OfferOut(
         id=offer.id,
+        request_id=offer.request_id,
         status=offer.status,
         revision=offer.revision,
         specialist=await specialist_public_out(session, offer.specialist_id, policy),

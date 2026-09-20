@@ -37,6 +37,7 @@ from app.models import (
 from app.models.enums import (
     ChangeVerdict,
     EvaluationStatus,
+    JobKind,
     PriceCheckVerdict,
     RequestStatus,
 )
@@ -143,6 +144,33 @@ async def create_evaluation(
     )
     session.add(evaluation)
     await session.flush()
+    return evaluation
+
+
+async def queue_for_closed_case(
+    session: AsyncSession, *, request: Request, selection: Selection
+) -> Evaluation | None:
+    """Create and queue the cost-transparency evaluation for a case that just closed.
+
+    Aggregation happens after closing — normal completion, a settlement agreement, a
+    ruling, or a cancellation. Cancelling does not create a positive sample, and it does
+    not erase a negative cause that was already established.
+    """
+    from app.domain import jobs
+
+    evaluation = await create_evaluation(
+        session,
+        request_id=request.id,
+        selection=selection,
+        policy_version_id=request.policy_version_id,
+    )
+    await jobs.schedule(
+        session,
+        JobKind.run_evaluation,
+        now(),
+        subject_id=evaluation.id,
+        dedupe_key=f"evaluation:{evaluation.id}",
+    )
     return evaluation
 
 

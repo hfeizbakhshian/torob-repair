@@ -28,6 +28,7 @@ from app.domain import (
 )
 from app.domain import (
     ai_flows,
+    jobs,
 )
 from app.domain import (
     refunds as refund_service,
@@ -139,9 +140,21 @@ async def run_job(job_kind: JobKind, subject_id: uuid.UUID | None, ai: AiService
 
         case JobKind.retention_cleanup:
             await run_retention_cleanup()
+            await schedule_retention_cleanup()
 
         case _:
             logger.warning("unhandled job kind %s", job_kind)
+
+
+async def schedule_retention_cleanup() -> None:
+    """Keep exactly one cleanup queued, a day ahead."""
+    async with session_scope() as session:
+        await jobs.schedule(
+            session,
+            JobKind.retention_cleanup,
+            now() + timedelta(days=1),
+            dedupe_key="retention_cleanup",
+        )
 
 
 async def run_retention_cleanup() -> None:
@@ -250,6 +263,7 @@ async def main() -> None:
         await load_clock_offset(session)
         policy = await load_policy(session, None)
     ai = AiService(build_provider(), policy)
+    await schedule_retention_cleanup()
 
     stopping = asyncio.Event()
     loop = asyncio.get_running_loop()

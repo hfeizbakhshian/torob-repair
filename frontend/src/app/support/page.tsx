@@ -223,6 +223,28 @@ export default function SupportPage() {
                   تعداد اقلام: {dispute.claimItems.length.toLocaleString("fa-IR")} — دور
                   تکمیل شواهد: {dispute.evidenceRoundsUsed.toLocaleString("fa-IR")}
                 </p>
+                {dispute.status === "awaiting_ai" && (
+                  <div className="mt-2">
+                    <Button
+                      busy={busy}
+                      onClick={() =>
+                        void act(async () => {
+                          await api(`/api/support/disputes/${dispute.id}/extend-budget`, {
+                            method: "POST",
+                            body: { reason: "علت توقف بررسی و رفع شد." },
+                          });
+                        })
+                      }
+                      data-testid={`extend-${dispute.id}`}
+                    >
+                      تمدید یک‌بارهٔ بودجهٔ داوری
+                    </Button>
+                    <p className="mt-1 text-xs text-ink-500">
+                      تمدید فقط یک بار و با ثبت دلیل ممکن است. پشتیبان شواهد را تکمیل
+                      می‌کند و جانشین صادرکنندهٔ حکم نیست.
+                    </p>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

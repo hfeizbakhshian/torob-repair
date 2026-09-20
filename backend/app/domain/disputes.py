@@ -402,6 +402,10 @@ async def _apply_settlement(
         selection.ended_at = now()
         selection.bump()
     await session.flush()
+
+    from app.domain.evaluation import queue_for_closed_case
+
+    await queue_for_closed_case(session, request=request, selection=selection)
     return settlement
 
 

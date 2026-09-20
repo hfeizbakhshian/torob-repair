@@ -739,3 +739,91 @@ async def test_extending_requires_a_parked_dispute_and_a_reason(session, policy,
             session, dispute_id=dispute.id, support_id=support.id,
             reason="زود است", policy=policy,
         )
+
+
+async def test_closing_a_case_queues_its_evaluation(session, policy, advance):
+    """Score aggregation starts when the case closes, not before."""
+    from app.domain import expenses as expense_service
+    from app.models import Job
+    from app.models.enums import JobKind
+
+    request = await factories.published_request(session, policy)
+    await factories.submit_offer(session, policy, request, "specialist-arya")
+    selection = await factories.accepted_collaboration(
+        session, policy, request, "specialist-arya"
+    )
+    await factories.activate_agreement(session, policy, request, selection)
+    advance(days=3)
+    await agreement_service.start_work(
+        session, selection_id=selection.id, actor_id=selection.specialist_id,
+        expected_revision=None,
+    )
+    await session.commit()
+
+    version = await expense_service.submit_expense_version(
+        session, selection_id=selection.id, specialist_id=selection.specialist_id,
+        lines=factories.clutch_lines(), source_text=None, actual_minutes=190,
+        extracted_by_ai=False,
+    )
+    await session.commit()
+
+    # Nothing is queued while the case is still open.
+    before = list(
+        (
+            await session.execute(
+                select(Job).where(Job.kind == JobKind.run_evaluation)
+            )
+        ).scalars()
+    )
+    assert before == []
+
+    await expense_service.review_receipt(
+        session, expense_version_id=version.id, customer_id=request.customer_id,
+        approve=True, reason=None,
+    )
+    await session.commit()
+    await expense_service.request_completion(
+        session, selection_id=selection.id, specialist_id=selection.specialist_id
+    )
+    await session.commit()
+    await expense_service.confirm_completion(
+        session, selection_id=selection.id, customer_id=request.customer_id,
+        expected_revision=None, satisfaction_score=5, satisfaction_note=None,
+        reference_consent=True,
+    )
+    await session.commit()
+
+    queued = list(
+        (
+            await session.execute(
+                select(Job).where(Job.kind == JobKind.run_evaluation)
+            )
+        ).scalars()
+    )
+    assert len(queued) == 1
+    evaluation = (
+        await session.execute(
+            select(Evaluation).where(Evaluation.request_id == request.id)
+        )
+    ).scalar_one()
+    assert queued[0].subject_id == evaluation.id
+
+
+async def test_adjudicated_case_also_queues_its_evaluation(session, policy, advance, ai):
+    from app.models import Job
+    from app.models.enums import JobKind
+
+    _, _, _, dispute = await disputed_case(session, policy, advance)
+    advance(hours=25)
+    await session.commit()
+    await ai_flows.adjudicate_dispute(ai, dispute_id=dispute.id, allow_evidence_round=False)
+    await session.close()
+
+    queued = list(
+        (
+            await session.execute(
+                select(Job).where(Job.kind == JobKind.run_evaluation)
+            )
+        ).scalars()
+    )
+    assert len(queued) == 1

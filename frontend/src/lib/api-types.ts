@@ -1941,6 +1941,11 @@ export interface components {
             id: string;
             /** Notselectablereason */
             notSelectableReason?: string | null;
+            /**
+             * Requestid
+             * Format: uuid
+             */
+            requestId: string;
             /** Revision */
             revision: number;
             /** Selectable */
