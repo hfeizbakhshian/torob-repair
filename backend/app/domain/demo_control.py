@@ -10,13 +10,14 @@ import time
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import clock
 from app.config import settings
 from app.domain.errors import forbidden
-from app.models import DemoSetting
+from app.models import DemoSetting, Job
+from app.models.enums import JobStatus
 
 CLOCK_OFFSET_KEY = "clock_offset_seconds"
 DEMO_REFERENCE_READY_KEY = "demo_reference_ready"
@@ -89,9 +90,25 @@ async def advance_clock(session: AsyncSession, delta: timedelta) -> timedelta:
 
 
 async def reset_clock(session: AsyncSession) -> None:
+    """Return the demo clock to real time.
+
+    This is the one place the clock moves backwards, so anything queued while time was
+    advanced would otherwise sit in the future and silently never run. Pending work is
+    shifted by the same amount, keeping each job due at the same point relative to the
+    clock it was scheduled against. Work already leased or finished is left alone.
+    """
     require_demo_mode()
+    previous = clock.offset()
     clock.reset()
     await _set(session, CLOCK_OFFSET_KEY, {"seconds": 0.0})
+
+    if previous <= timedelta(0):
+        return
+    await session.execute(
+        update(Job)
+        .where(Job.status == JobStatus.pending, Job.run_at > clock.now())
+        .values(run_at=Job.run_at - previous)
+    )
 
 
 async def is_demo_reference_ready(session: AsyncSession) -> bool:

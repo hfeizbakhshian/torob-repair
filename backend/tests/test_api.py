@@ -389,3 +389,37 @@ async def test_demo_flag_is_visible_immediately_after_setting_it(client: AsyncCl
 
     disabled = await client.post("/api/demo/reference-ready", json={"enabled": False})
     assert disabled.json()["demoReferenceReady"] is False
+
+
+async def test_resetting_the_demo_clock_does_not_strand_queued_work(client: AsyncClient):
+    """Work queued while time was advanced must still become due after a reset."""
+    from sqlalchemy import select
+
+    from app import clock
+    from app.db import session_scope
+    from app.domain import jobs
+    from app.models import Job
+    from app.models.enums import JobKind, JobStatus
+
+    await sign_in(client, "support-mina")
+    await client.post("/api/demo/advance-clock", json={"seconds": 60 * 60 * 48})
+
+    async with session_scope() as session:
+        await jobs.schedule(
+            session,
+            JobKind.retention_cleanup,
+            clock.now(),
+            dedupe_key="strand-check",
+        )
+
+    await client.post("/api/demo/reset-clock")
+
+    async with session_scope() as session:
+        job = (
+            await session.execute(
+                select(Job).where(Job.dedupe_key == "strand-check")
+            )
+        ).scalar_one()
+        assert job.status is JobStatus.pending
+        # Due now, not two days in the future.
+        assert job.run_at <= clock.now()
