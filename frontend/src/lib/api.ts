@@ -32,6 +32,7 @@ export type AiUsageOut = Schemas["AiUsageOut"];
 export type PartOptionOut = Schemas["PartOptionOut"];
 export type PriceSnapshotOut = Schemas["PriceSnapshotOut"];
 export type PriceCheckOut = Schemas["PriceCheckOut"];
+export type PartSearchOut = Schemas["PartSearchOut"];
 export type LineItem = Schemas["LineItem"];
 export type SupportQueueOut = Schemas["SupportQueueOut"];
 export type MetricsOut = Schemas["MetricsOut"];

@@ -7,7 +7,15 @@ const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta
 const config = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: [".next/**", "node_modules/**", "src/lib/api-types.ts", "playwright-report/**"],
+    // next-env.d.ts and api-types.ts are generated files and are never hand-edited.
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "next-env.d.ts",
+      "src/lib/api-types.ts",
+      "playwright-report/**",
+      "test-results/**",
+    ],
   },
 ];
 
