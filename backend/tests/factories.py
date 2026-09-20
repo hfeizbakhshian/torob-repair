@@ -212,7 +212,7 @@ async def activate_agreement(
         scheduled_at=selection.scheduled_at,
         warranty_note="ضمانت نمونهٔ ۶ ماهه",
         change_reason=change_reason,
-        evidence_ids=evidence_ids or ["ev-sample"],
+        evidence_ids=["ev-sample"] if evidence_ids is None else evidence_ids,
         policy=policy,
     )
     await session.commit()
