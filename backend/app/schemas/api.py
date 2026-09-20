@@ -211,7 +211,7 @@ class OfferVersionOut(ApiModel):
     id: uuid.UUID
     version_number: int
     offer_type: OfferType
-    lines: list[dict[str, Any]]
+    lines: list[LineItem]
     scenarios: list[dict[str, Any]]
     total_toman: int | None
     specialist_payable_toman: int | None
@@ -320,7 +320,7 @@ class AgreementOut(ApiModel):
     version_number: int
     status: AgreementStatus
     revision: int
-    lines: list[dict[str, Any]]
+    lines: list[LineItem]
     scenarios: list[dict[str, Any]]
     total_toman: int | None
     specialist_payable_toman: int | None
@@ -372,7 +372,7 @@ class ExpenseVersionOut(ApiModel):
     id: uuid.UUID
     version_number: int
     source_text: str | None
-    lines: list[dict[str, Any]]
+    lines: list[LineItem]
     actual_minutes: int | None
     total_toman: int | None
     specialist_payable_toman: int | None

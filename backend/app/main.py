@@ -30,6 +30,7 @@ from app.config import settings
 from app.db import dispose, session_scope
 from app.domain.demo_control import load_clock_offset
 from app.domain.policy_service import ensure_active_policy
+from app.schemas.api import ErrorResponse
 
 
 @asynccontextmanager
@@ -43,6 +44,21 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await dispose()
 
 
+# Every failure is rendered as this one shape, so it belongs in the published contract
+# rather than only in the prose.
+ERROR_RESPONSES: dict[int | str, dict[str, object]] = {
+    status: {"model": ErrorResponse, "description": description}
+    for status, description in {
+        403: "FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد",
+        404: "NOT_FOUND — مورد خواسته‌شده وجود ندارد",
+        409: "VERSION_CONFLICT یا INVALID_STATE",
+        422: "VALIDATION_ERROR — ورودی معتبر نیست",
+        429: "QUOTA_EXCEEDED — سقف مصرف پر شده است",
+        503: "SERVICE_UNAVAILABLE — سرویس در دسترس نیست",
+    }.items()
+}
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="ترب تعمیر — API",
@@ -52,6 +68,7 @@ def create_app() -> FastAPI:
             "در این نصب صریحاً برچسب‌گذاری می‌شوند."
         ),
         lifespan=lifespan,
+        responses=ERROR_RESPONSES,
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )

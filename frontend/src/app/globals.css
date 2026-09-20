@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/*
+ * Light background, dark text, red accent, and a readable Persian system font stack —
+ * no CDN font dependency. Sizes are set so the layout works from 360px upward without
+ * unwanted horizontal scrolling.
+ */
+@theme {
+  --font-sans: "Vazirmatn", "IRANSans", "Segoe UI", Tahoma, "Noto Naskh Arabic", sans-serif;
+  --color-brand-50: #fef2f2;
+  --color-brand-100: #ffe4e4;
+  --color-brand-500: #e11d2e;
+  --color-brand-600: #c81328;
+  --color-brand-700: #a30f20;
+  --color-ink-900: #16181d;
+  --color-ink-700: #3b4048;
+  --color-ink-500: #666d78;
+  --color-ink-200: #dfe3e8;
+  --color-ink-100: #eef1f4;
+  --color-ink-50: #f7f9fb;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-ink-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Persian digits everywhere numbers are displayed as text. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus must stay visible: never remove the outline without a replacement. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* An error is carried by its text and icon, not by colour alone. */
+.field-error {
+  color: var(--color-brand-700);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
