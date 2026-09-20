@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/.playwright/
+
+# Environment and local data
+.env
+.env.local
+/backend/var/
+/var/
+
+# Editor / OS
+.DS_Store
+*.swp
