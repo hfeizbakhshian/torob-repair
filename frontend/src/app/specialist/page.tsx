@@ -458,23 +458,28 @@ export default function SpecialistPage() {
                       >
                         مخارج و فاکتور نهایی
                       </Link>
-                      {!selection.workStartedAt && (
-                        <Button
-                          variant="secondary"
-                          onClick={() =>
-                            void act(async () => {
-                              await api(`/api/selections/${selection.id}/start`, {
-                                method: "POST",
-                                body: { expectedRevision: selection.revision },
-                              });
-                            })
-                          }
-                          busy={busy}
-                          data-testid={`start-${selection.id}`}
-                        >
-                          ثبت شروع کار
-                        </Button>
-                      )}
+                      {!selection.workStartedAt &&
+                        (new Date(selection.scheduledAt) > now ? (
+                          <span className="self-center text-xs text-ink-500">
+                            شروع کار از {tehranTime(selection.scheduledAt)} ممکن است
+                          </span>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            onClick={() =>
+                              void act(async () => {
+                                await api(`/api/selections/${selection.id}/start`, {
+                                  method: "POST",
+                                  body: { expectedRevision: selection.revision },
+                                });
+                              })
+                            }
+                            busy={busy}
+                            data-testid={`start-${selection.id}`}
+                          >
+                            ثبت شروع کار
+                          </Button>
+                        ))}
                     </div>
                   )}
 

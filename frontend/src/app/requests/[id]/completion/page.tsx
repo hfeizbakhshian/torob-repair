@@ -91,6 +91,14 @@ export default function CompletionPage() {
   const { selection, expenses, completion, agreements } = bundle;
   const active = activeAgreement(agreements);
   const current = expenses.length > 0 ? expenses[expenses.length - 1] : undefined;
+  // A disabled button with no reason is a dead end. Say what the case is waiting for.
+  const waitingFor = !selection
+    ? null
+    : !selection.workStartedAt
+      ? `کار هنوز شروع نشده است. متخصص از ${tehranTime(selection.scheduledAt)} می‌تواند شروع کار را ثبت کند؛ پیش از آن پایان کار معنا ندارد.`
+      : !current?.submittedAt
+        ? "متخصص هنوز مخارج و فاکتور نهایی را نفرستاده است."
+        : null;
 
   const extractExpenses = () =>
     act(async () => {
@@ -135,7 +143,7 @@ export default function CompletionPage() {
       {error && <ErrorNote message={error.message} fields={error.fieldErrors} />}
       {!selection && <Empty>هنوز همکاری پذیرفته‌شده‌ای وجود ندارد.</Empty>}
 
-      {selection && isSpecialist && (
+      {selection && isSpecialist && selection.workStartedAt && (
         <Card
           title="ثبت مخارج از روی متن"
           subtitle="متن شما به اقلام تبدیل می‌شود و پیش از نمایش به مشتری خودتان آن را بازبینی می‌کنید."
@@ -295,6 +303,11 @@ export default function CompletionPage() {
 
       {selection && (
         <Card title="پایان کار">
+          {waitingFor && (
+            <div className="mb-3">
+              <InfoNote>{waitingFor}</InfoNote>
+            </div>
+          )}
           {active && (
             <p className="mb-3 text-sm">
               مبلغ توافق فعال:{" "}
