@@ -144,15 +144,31 @@ async def summarise_request(
 
         version.summary_facts = summary.facts
         version.summary_unknowns = summary.unknowns
-        # Missing information narrows the allowed offer type towards a diagnosis or an
-        # in-person check, rather than producing a confident price.
+        # Missing information steers the offer type away from a confident price, but only
+        # inside what the requested service itself allows: a specific replacement takes a
+        # fixed or conditional offer of that same operation, and a cheap diagnosis is never
+        # a valid substitute for a full repair request. Narrowing outside that set would
+        # leave no offer a specialist could legally make.
+        offerable = await _offerable_types(session, version.service_code)
+        narrowed: list[str] = []
         if summary.needs_in_person_check:
-            version.allowed_offer_types = ["diagnostic"]
-        elif summary.suggested_offer_type in version.allowed_offer_types:
-            version.allowed_offer_types = [summary.suggested_offer_type]
+            narrowed = [kind for kind in ("diagnostic", "conditional") if kind in offerable]
+        elif summary.suggested_offer_type in offerable:
+            narrowed = [str(summary.suggested_offer_type)]
+        version.allowed_offer_types = narrowed or offerable
         version.summary_confirmed_at = None
         request.bump()
     return outcome
+
+
+async def _offerable_types(session: Any, service_code: str) -> list[str]:
+    """What the requested service permits. The AI narrows within this, never beyond it."""
+    from app.models import ServiceTemplate
+
+    template = (
+        await session.execute(select(ServiceTemplate).where(ServiceTemplate.code == service_code))
+    ).scalar_one_or_none()
+    return list(template.allowed_offer_types) if template is not None else []
 
 
 async def _mark_stale(session: Any, run_id: uuid.UUID) -> None:

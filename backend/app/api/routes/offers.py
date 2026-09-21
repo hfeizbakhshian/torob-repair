@@ -177,10 +177,20 @@ async def compare_offers(
             seen.add(item.offer_version_id)
             offers.append(rendered[item.offer_version_id])
         unpriced = all(item.total_toman is None for item in items)
+        # Specialists name their scenarios in Persian; the code is only the join key.
+        titled = next(
+            (
+                str(scenario["title"])
+                for offer in offers
+                for scenario in offer.version.scenarios
+                if scenario.get("code") == code and scenario.get("title")
+            ),
+            None,
+        )
         groups.append(
             ScenarioGroupOut(
                 scenario_code=code,
-                title=code or "پیشنهادهای بدون سناریو",
+                title=titled or code or "پیشنهادهای بدون سناریو",
                 offers=offers,
                 note=UNPRICED_NOTE if unpriced else None,
             )
