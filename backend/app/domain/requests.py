@@ -458,6 +458,60 @@ async def add_typo_note(
     return version
 
 
+DELETABLE_STATUSES = frozenset(
+    {
+        RequestStatus.draft,
+        RequestStatus.cancelled,
+        RequestStatus.closed_unselected,
+        RequestStatus.completed,
+        RequestStatus.closed_settled,
+        RequestStatus.closed_adjudicated,
+    }
+)
+"""A live case is never deleted: specialists have already put work into it."""
+
+
+async def delete_request(
+    session: AsyncSession,
+    *,
+    request_id: uuid.UUID,
+    customer_id: uuid.UUID,
+    expected_revision: int | None,
+) -> Request:
+    """Hide a finished or unpublished request from the customer's own list.
+
+    Nothing is erased. A draft is closed on the way out so the package fee keeps its
+    refund path, and support still sees the case.
+    """
+    request = await lock_row(session, Request, request_id)
+    if request.customer_id != customer_id:
+        raise forbidden("این درخواست متعلق به حساب شما نیست.")
+    check_revision(request, expected_revision)
+    if request.deleted_at is not None:
+        return request
+    if request.status not in DELETABLE_STATUSES:
+        raise invalid_state(
+            "درخواست در جریان حذف نمی‌شود؛ ابتدا آن را لغو کنید یا تا پایان کار صبر کنید."
+        )
+
+    previous_status = request.status
+    if request.status is RequestStatus.draft:
+        request.status = RequestStatus.cancelled
+        request.close_reason = CloseReason.abandoned_before_publish
+        request.closed_at = now()
+    request.deleted_at = now()
+    request.bump()
+    await audit.record(
+        session,
+        "request_deleted",
+        request_id=request.id,
+        actor_id=customer_id,
+        actor_role="customer",
+        data={"previousStatus": previous_status.value},
+    )
+    return request
+
+
 async def abandon_before_publish(
     session: AsyncSession, *, request_id: uuid.UUID, customer_id: uuid.UUID
 ) -> Request:

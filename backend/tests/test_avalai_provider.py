@@ -49,11 +49,31 @@ async def invoke(body, status=200):
     assert calls[0].headers["Authorization"] == "Bearer test-secret"
     assert "X-AvalAI-Session-Id" not in calls[0].headers
     sent = json.loads(calls[0].content)
-    assert set(sent) == {"model", "messages", "max_tokens", "stream"}
+    assert set(sent) == {"model", "messages", "max_tokens", "thinking", "stream"}
     assert sent["max_tokens"] == 100
+    assert sent["thinking"] == {"type": "disabled"}
     assert sent["model"] == "deepseek-v4.1-flash"
     assert sent["stream"] is False
     return response
+
+
+async def test_thinking_is_explicit_for_judgement_work():
+    """Never rely on the model's default: reasoning tokens are billed as output."""
+    sent = {}
+
+    def handler(req):
+        sent.update(json.loads(req.content))
+        return httpx.Response(200, json=envelope())
+
+    provider = AvalAiProvider(
+        api_key="test",
+        base_url="http://avalai.test/v1",
+        transport=httpx.MockTransport(handler),
+    )
+    thinking = request().model_copy(update={"thinking_enabled": True, "reasoning_effort": "low"})
+    assert (await provider.complete(thinking)).ok
+    assert sent["thinking"] == {"type": "enabled"}
+    assert sent["reasoning_effort"] == "low"
 
 
 async def test_success_and_usage():

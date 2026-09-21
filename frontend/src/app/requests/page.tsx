@@ -12,10 +12,38 @@ import {
 } from "@/lib/api";
 import { Card, Empty, ErrorNote, Spinner, StatusPill } from "@/components/ui";
 
+/** Mirrors DELETABLE_STATUSES on the server; a live case keeps a specialist's work. */
+const DELETABLE = new Set([
+  "draft",
+  "cancelled",
+  "closed_unselected",
+  "completed",
+  "closed_settled",
+  "closed_adjudicated",
+]);
+
 export default function MyRequestsPage() {
   const [requests, setRequests] = useState<RequestOut[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const now = new Date();
+
+  async function remove(request: RequestOut) {
+    setDeleting(request.id);
+    setError(null);
+    try {
+      await api<void>(`/api/requests/${request.id}?expected_revision=${request.revision}`, {
+        method: "DELETE",
+      });
+      setRequests((rows) => (rows ?? []).filter((row) => row.id !== request.id));
+      setConfirming(null);
+    } catch (problem) {
+      setError(problem as ApiError);
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   useEffect(() => {
     api<RequestOut[]>("/api/requests")
@@ -61,6 +89,35 @@ export default function MyRequestsPage() {
                     مهلت پیشنهاد: {relativeDeadline(request.responseDeadline, now)}
                   </span>
                 )}
+                {DELETABLE.has(request.status) &&
+                  (confirming === request.id ? (
+                    <span className="flex items-center gap-2 text-xs">
+                      <span className="text-ink-500">حذف شود؟</span>
+                      <button
+                        type="button"
+                        onClick={() => void remove(request)}
+                        disabled={deleting === request.id}
+                        className="min-h-8 rounded-md bg-red-600 px-2 py-1 font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                      >
+                        {deleting === request.id ? "در حال حذف…" : "بله، حذف کن"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirming(null)}
+                        className="min-h-8 rounded-md border border-ink-200 px-2 py-1 text-ink-600 hover:bg-ink-50"
+                      >
+                        انصراف
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(request.id)}
+                      className="min-h-8 text-xs text-ink-500 underline hover:text-red-600"
+                    >
+                      حذف از فهرست
+                    </button>
+                  ))}
               </div>
             </div>
           </Card>

@@ -603,7 +603,11 @@ export interface paths {
         get: operations["get_request_api_requests__request_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Request
+         * @description Remove the request from the customer's list. Nothing is erased.
+         */
+        delete: operations["delete_request_api_requests__request_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5247,6 +5251,82 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RequestOut"];
                 };
+            };
+            /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description NOT_FOUND — مورد خواسته‌شده وجود ندارد */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VERSION_CONFLICT یا INVALID_STATE */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VALIDATION_ERROR — ورودی معتبر نیست */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description QUOTA_EXCEEDED — سقف مصرف پر شده است */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description SERVICE_UNAVAILABLE — سرویس در دسترس نیست */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_request_api_requests__request_id__delete: {
+        parameters: {
+            query?: {
+                expected_revision?: number | null;
+            };
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */
             403: {

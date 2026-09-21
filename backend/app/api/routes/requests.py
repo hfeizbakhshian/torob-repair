@@ -48,7 +48,7 @@ async def create_request(
 async def my_requests(session: SessionDep, customer: CustomerDep) -> list[RequestOut]:
     rows = await session.execute(
         select(Request)
-        .where(Request.customer_id == customer.user_id)
+        .where(Request.customer_id == customer.user_id, Request.deleted_at.is_(None))
         .order_by(Request.created_at.desc())
     )
     return [await request_out(session, row) for row in rows.scalars()]
@@ -58,7 +58,11 @@ async def _visible_request(session: SessionDep, request_id: uuid.UUID, user: Use
     request = await session.get(Request, request_id)
     if request is None:
         raise not_found("این درخواست پیدا نشد.")
-    if user.role is Role.support or request.customer_id == user.user_id:
+    if user.role is Role.support:
+        return request
+    if request.deleted_at is not None:
+        raise not_found("این درخواست پیدا نشد.")
+    if request.customer_id == user.user_id:
         return request
     # A specialist sees a case only while it is open to them, or once they are the
     # selected one; a former collaborator keeps no access to a new one.
@@ -113,6 +117,23 @@ async def get_payment(
         )
     ).scalar_one_or_none()
     return payment_out(payment) if payment else None
+
+
+@router.delete("/{request_id}", status_code=204)
+async def delete_request(
+    request_id: uuid.UUID,
+    session: SessionDep,
+    customer: CustomerDep,
+    expected_revision: int | None = None,
+) -> None:
+    """Remove the request from the customer's list. Nothing is erased."""
+    await service.delete_request(
+        session,
+        request_id=request_id,
+        customer_id=customer.user_id,
+        expected_revision=expected_revision,
+    )
+    await session.commit()
 
 
 @router.post("/{request_id}/confirm-summary", response_model=RequestOut)

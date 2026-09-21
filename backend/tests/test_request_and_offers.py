@@ -315,3 +315,90 @@ async def test_typo_note_does_not_invalidate_existing_offers(session, policy):
     assert refreshed.current_version_id == before
     current = await request_service.current_version(session, refreshed)
     assert len(current.typo_notes) == 1
+
+
+async def test_deleting_a_draft_hides_it_but_keeps_the_paid_fee(session, policy):
+    """Deletion is for the customer's own list; the settled fee keeps its refund path."""
+    customer = await factories.user(session, "customer-sahar")
+    request = await request_service.create_draft(
+        session,
+        customer_id=customer.id,
+        city=factories.CITY,
+        district="تهرانسر",
+        vehicle_details={},
+        vehicle_code=factories.VEHICLE,
+        service_code=factories.CLUTCH,
+        symptoms="صدای غیرعادی",
+    )
+    await request_service.pay_registration_fee(
+        session,
+        request_id=request.id,
+        customer_id=customer.id,
+        idempotency_key="fee-1",
+        policy=policy,
+    )
+    await session.commit()
+
+    await request_service.delete_request(
+        session,
+        request_id=request.id,
+        customer_id=customer.id,
+        expected_revision=request.revision,
+    )
+    await session.commit()
+
+    assert request.deleted_at is not None
+    # A draft is closed on the way out, so the fee is still refundable.
+    assert request.status is RequestStatus.cancelled
+    payments = (
+        await session.execute(select(Payment).where(Payment.request_id == request.id))
+    ).scalars().all()
+    assert len(payments) == 1 and payments[0].status is PaymentStatus.succeeded
+    assert await session.get(Request, request.id) is not None
+
+
+async def test_deleting_is_idempotent_and_only_for_the_owner(session, policy):
+    customer = await factories.user(session, "customer-sahar")
+    other = await factories.user(session, "customer-omid")
+    request = await request_service.create_draft(
+        session,
+        customer_id=customer.id,
+        city=factories.CITY,
+        district="تهرانسر",
+        vehicle_details={},
+        vehicle_code=factories.VEHICLE,
+        service_code=factories.CLUTCH,
+        symptoms="صدای غیرعادی",
+    )
+    await session.commit()
+
+    with pytest.raises(DomainError) as stranger:
+        await request_service.delete_request(
+            session, request_id=request.id, customer_id=other.id, expected_revision=None
+        )
+    assert stranger.value.code is ErrorCode.forbidden
+
+    await request_service.delete_request(
+        session, request_id=request.id, customer_id=customer.id, expected_revision=None
+    )
+    await session.commit()
+    first = request.deleted_at
+    # Repeating the call is a no-op rather than a second close.
+    await request_service.delete_request(
+        session, request_id=request.id, customer_id=customer.id, expected_revision=None
+    )
+    assert request.deleted_at == first
+
+
+async def test_a_live_case_cannot_be_deleted(session, policy):
+    """A published case carries a specialist's work; it is cancelled, never removed."""
+    request = await factories.published_request(session, policy)
+    with pytest.raises(DomainError) as live:
+        await request_service.delete_request(
+            session,
+            request_id=request.id,
+            customer_id=request.customer_id,
+            expected_revision=request.revision,
+        )
+    assert live.value.code is ErrorCode.invalid_state
+    assert request.deleted_at is None

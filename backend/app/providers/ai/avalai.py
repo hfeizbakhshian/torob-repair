@@ -72,12 +72,18 @@ class AvalAiProvider:
 
         # AiService already includes the schema in its counted/reserved messages.
         # No tools, session continuation, JSON mode or automatic upstream routing.
-        body = {
+        # The thinking mode is always explicit: a reasoning model left on its default
+        # spends the reserved output budget on reasoning and returns a truncated answer.
+        # Both configured models read `thinking`; an OpenAI model would not.
+        body: dict[str, Any] = {
             "model": self.model,
             "messages": [message.model_dump() for message in request.messages],
             "max_tokens": request.max_output_tokens,
+            "thinking": {"type": "enabled" if request.thinking_enabled else "disabled"},
             "stream": False,
         }
+        if request.thinking_enabled and request.reasoning_effort:
+            body["reasoning_effort"] = request.reasoning_effort
         try:
             async with httpx.AsyncClient(
                 transport=self._transport,

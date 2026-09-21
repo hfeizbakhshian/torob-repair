@@ -12,8 +12,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-POLICY_VERSION = 1
-POLICY_LABEL = "MVP demo defaults"
+POLICY_VERSION = 2
+POLICY_LABEL = "MVP demo defaults, output caps sized for Persian JSON"
 
 
 class TimingPolicy(BaseModel):
@@ -82,7 +82,7 @@ class AiPolicy(BaseModel):
     stages: dict[str, StageQuota] = Field(
         default_factory=lambda: {
             "customer": StageQuota(
-                input_tokens=8_000, output_tokens=2_000, max_output_per_call=650
+                input_tokens=8_000, output_tokens=6_000, max_output_per_call=2_000
             ),
             "specialist": StageQuota(
                 input_tokens=10_000, output_tokens=2_000, max_output_per_call=650
@@ -96,7 +96,7 @@ class AiPolicy(BaseModel):
         }
     )
     case_input_tokens: int = 40_000
-    case_output_tokens: int = 10_000
+    case_output_tokens: int = 16_000
     max_normal_calls_per_case: int = 12
     max_attempts_per_case: int = 16
     """Normal calls plus technical retries. A paid failed call consumes technical budget but

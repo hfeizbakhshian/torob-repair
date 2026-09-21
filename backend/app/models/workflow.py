@@ -73,6 +73,11 @@ class Request(Base, TimestampMixin, RevisionMixin):
         ForeignKey("request_versions.id", use_alter=True, name="fk_requests_current_version"),
         nullable=True,
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    """Hidden from the customer's own list. The row, its payments and its audit trail
+    stay, because a settled package fee still has a refund path."""
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     response_deadline: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
