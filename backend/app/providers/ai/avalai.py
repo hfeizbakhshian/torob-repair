@@ -75,6 +75,7 @@ class AvalAiProvider:
         body = {
             "model": self.model,
             "messages": [message.model_dump() for message in request.messages],
+            "max_tokens": request.max_output_tokens,
             "stream": False,
         }
         try:
@@ -144,7 +145,8 @@ class AvalAiProvider:
             or avalai.get("error_code")
         ):
             return result(failure_code)
-        # The gateway may ignore max_tokens; never apply a response over our reservation.
+        # A gateway that ignores max_tokens must not get a response applied over the
+        # reservation; the tokens are already paid for either way.
         if usage.output_tokens is not None and usage.output_tokens > request.max_output_tokens:
             return result("output_limit_exceeded")
         if not isinstance(content, str):

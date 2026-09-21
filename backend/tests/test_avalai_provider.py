@@ -49,7 +49,8 @@ async def invoke(body, status=200):
     assert calls[0].headers["Authorization"] == "Bearer test-secret"
     assert "X-AvalAI-Session-Id" not in calls[0].headers
     sent = json.loads(calls[0].content)
-    assert set(sent) == {"model", "messages", "stream"}
+    assert set(sent) == {"model", "messages", "max_tokens", "stream"}
+    assert sent["max_tokens"] == 100
     assert sent["model"] == "deepseek-v4.1-flash"
     assert sent["stream"] is False
     return response
