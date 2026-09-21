@@ -310,8 +310,12 @@ export default function RequestDetailPage() {
                             </div>
                             <div className="text-left">
                               <p className="tabular text-lg font-bold">
-                                {toman(offer.version.totalToman)}
+                                {toman(offer.scenarioTotalToman ?? offer.version.totalToman)}
                               </p>
+                              {offer.scenarioTotalToman !== null &&
+                                offer.scenarioTotalToman !== undefined && (
+                                  <p className="text-xs text-ink-500">برای همین سناریو</p>
+                                )}
                               <p className="text-xs text-ink-500">
                                 نوبت: {tehranTime(offer.version.scheduledAt)}
                               </p>

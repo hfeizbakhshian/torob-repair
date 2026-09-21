@@ -1854,6 +1854,28 @@
             "title": "Revision",
             "type": "integer"
           },
+          "scenarioSpecialistPayableToman": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenariospecialistpayabletoman"
+          },
+          "scenarioTotalToman": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenariototaltoman"
+          },
           "selectable": {
             "title": "Selectable",
             "type": "boolean"

@@ -2005,6 +2005,10 @@ export interface components {
             requestId: string;
             /** Revision */
             revision: number;
+            /** Scenariospecialistpayabletoman */
+            scenarioSpecialistPayableToman?: number | null;
+            /** Scenariototaltoman */
+            scenarioTotalToman?: number | null;
             /** Selectable */
             selectable: boolean;
             specialist: components["schemas"]["SpecialistPublicOut"];

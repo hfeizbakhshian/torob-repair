@@ -253,6 +253,10 @@ class OfferOut(ApiModel):
     version: OfferVersionOut
     selectable: bool
     not_selectable_reason: str | None = None
+    scenario_total_toman: int | None = None
+    """Inside a scenario group, what this offer costs *for that scenario*. The whole-offer
+    total covers every scenario at once and is not what the group is ranked by."""
+    scenario_specialist_payable_toman: int | None = None
 
 
 class OfferComparisonOut(ApiModel):

@@ -14,7 +14,7 @@ from app.domain import offers as service
 from app.domain.auth import specialist_profile
 from app.domain.comparison import ComparableOffer, SortKey, group_by_scenario, sort_offers
 from app.domain.errors import forbidden, not_found
-from app.domain.money import LineItem
+from app.domain.money import LineItem, Totals, compute_totals
 from app.models import Offer, OfferVersion, Request
 from app.models.enums import Role
 from app.schemas.api import (
@@ -145,15 +145,25 @@ async def compare_offers(
     }
 
     comparables: list[ComparableOffer] = []
+    scenario_totals: dict[tuple[str, str | None], Totals] = {}
     for offer, version in pairs:
         rendered_offer = rendered[str(version.id)]
         scenarios = version.scenarios or [{}]
+        lines = [LineItem.model_validate(line) for line in version.lines]
         for scenario in scenarios:
             code = scenario.get("code") if isinstance(scenario, dict) else None
+            # What this scenario costs is the sum of its own lines. A declared figure that
+            # the items do not add up to must not be what the ranking believes.
+            totals = compute_totals(lines, scenario_code=code) if lines else None
+            scenario_totals[(str(version.id), code)] = totals or Totals()
             total = (
-                scenario.get("totalToman")
-                if isinstance(scenario, dict) and scenario.get("code")
-                else version.total_toman
+                totals.total_toman
+                if totals is not None
+                else (
+                    scenario.get("totalToman")
+                    if isinstance(scenario, dict) and scenario.get("code")
+                    else version.total_toman
+                )
             )
             comparables.append(
                 ComparableOffer(
@@ -175,7 +185,19 @@ async def compare_offers(
             if item.offer_version_id in seen:
                 continue
             seen.add(item.offer_version_id)
-            offers.append(rendered[item.offer_version_id])
+            totals = scenario_totals.get((item.offer_version_id, code))
+            offers.append(
+                rendered[item.offer_version_id].model_copy(
+                    update={
+                        "scenario_total_toman": totals.total_toman if totals else None,
+                        "scenario_specialist_payable_toman": (
+                            totals.specialist_payable_toman if totals else None
+                        ),
+                    }
+                )
+                if code is not None
+                else rendered[item.offer_version_id]
+            )
         unpriced = all(item.total_toman is None for item in items)
         # Specialists name their scenarios in Persian; the code is only the join key.
         titled = next(
