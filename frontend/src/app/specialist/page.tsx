@@ -29,9 +29,11 @@ import {
   inputClass,
 } from "@/components/ui";
 
+type Part = { title: string; toman: string };
+
 type Draft = {
-  partTitle: string;
-  partToman: string;
+  offerType: string;
+  parts: Part[];
   minutes: string;
   hourlyRate: string;
   scheduledAt: string;
@@ -42,8 +44,9 @@ function defaultDraft(request: RequestOut): Draft {
   const start = request.visitWindowStart ? new Date(request.visitWindowStart) : new Date();
   const scheduled = new Date(start.getTime() + 3_600_000 * 24);
   return {
-    partTitle: "کیت کلاچ کامل",
-    partToman: "4200000",
+    // The service decides which kinds of offer it accepts; the form follows it.
+    offerType: request.version?.allowedOfferTypes?.[0] ?? "fixed",
+    parts: [{ title: "کیت کلاچ کامل", toman: "4200000" }],
     minutes: "180",
     hourlyRate: "400000",
     scheduledAt: scheduled.toISOString().slice(0, 16),
@@ -112,36 +115,66 @@ export default function SpecialistPage() {
       const rate = Number(draft.hourlyRate);
       const laborAmount = Math.round((minutes * rate) / 60);
       const deadline = request.responseDeadline ? new Date(request.responseDeadline) : new Date();
+      const usable = draft.parts.filter((row) => row.title.trim() && Number(row.toman) > 0);
+      const part = usable.reduce((sum, row) => sum + Number(row.toman), 0);
+      const offerType = draft.offerType;
+      const partLines = usable.map((row, index) => ({
+        id: `part-${index + 1}`,
+        type: "part",
+        title: row.title,
+        quantity: 1,
+        unitRateToman: Number(row.toman),
+        amountToman: Number(row.toman),
+        amountKnown: true,
+        suppliedBy: "specialist",
+        paidTo: "specialist",
+        // A conditional offer prices the parts only in the scenario that needs them.
+        ...(offerType === "conditional" ? { scenarioCode: "with_part" } : {}),
+      }));
+      const laborLine = {
+        id: "labor-1",
+        type: "labor",
+        title: offerType === "diagnostic" ? "اجرت عیب‌یابی" : "اجرت انجام کار",
+        operationCode: "main",
+        minutes,
+        hourlyRateToman: rate,
+        amountToman: laborAmount,
+        amountKnown: true,
+        suppliedBy: "specialist",
+        paidTo: "specialist",
+      };
       await api(`/api/requests/${request.id}/offers`, {
         method: "POST",
         body: {
-          offerType: "fixed",
-          lines: [
-            {
-              id: "part-1",
-              type: "part",
-              title: draft.partTitle,
-              quantity: 1,
-              unitRateToman: Number(draft.partToman),
-              amountToman: Number(draft.partToman),
-              amountKnown: true,
-              suppliedBy: "specialist",
-              paidTo: "specialist",
-            },
-            {
-              id: "labor-1",
-              type: "labor",
-              title: "اجرت انجام کار",
-              operationCode: "main",
-              minutes,
-              hourlyRateToman: rate,
-              amountToman: laborAmount,
-              amountKnown: true,
-              suppliedBy: "specialist",
-              paidTo: "specialist",
-            },
-          ],
-          scenarios: [],
+          offerType,
+          lines: offerType === "diagnostic" ? [laborLine] : [...partLines, laborLine],
+          scenarios:
+            offerType === "conditional"
+              ? [
+                  {
+                    code: "labor_only",
+                    title: "بدون تعویض قطعه",
+                    totalToman: laborAmount,
+                  },
+                  {
+                    code: "with_part",
+                    title:
+                      usable.length === 1
+                        ? `با تعویض ${usable[0]?.title ?? "قطعه"}`
+                        : `با تعویض ${usable.length.toLocaleString("fa-IR")} قطعه`,
+                    totalToman: part + laborAmount,
+                  },
+                ]
+              : [],
+          conditionsNote:
+            offerType === "conditional"
+              ? "مبلغ نهایی پس از بازدید و بر اساس سناریوی محقق‌شده تعیین می‌شود."
+              : null,
+          diagnosticFeeToman: offerType === "diagnostic" ? laborAmount : null,
+          diagnosticScope:
+            offerType === "diagnostic"
+              ? "بررسی و تعیین علت؛ تعمیر یا تعویض قطعه جداگانه توافق می‌شود."
+              : null,
           scheduledAt: new Date(draft.scheduledAt).toISOString(),
           validUntil: new Date(deadline.getTime() + 3_600_000 * 48).toISOString(),
           estimatedMinutes: minutes,
@@ -267,34 +300,94 @@ export default function SpecialistPage() {
                       <summary className="cursor-pointer text-sm font-medium">
                         ثبت یا ویرایش پیشنهاد
                       </summary>
+                      {(request.version?.allowedOfferTypes?.length ?? 0) > 1 && (
+                        <div className="mt-2">
+                          <Field label="نوع پیشنهاد" htmlFor={`ot-${request.id}`}>
+                            <select
+                              id={`ot-${request.id}`}
+                              className={inputClass}
+                              value={draft.offerType}
+                              onChange={(event) =>
+                                setDrafts({
+                                  ...drafts,
+                                  [request.id]: { ...draft, offerType: event.target.value },
+                                })
+                              }
+                            >
+                              {request.version?.allowedOfferTypes?.map((kind) => (
+                                <option key={kind} value={kind}>
+                                  {OFFER_TYPE_LABELS[kind] ?? kind}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                        </div>
+                      )}
+
+                      {draft.offerType !== "diagnostic" && (
+                        <div className="mt-2 flex flex-col gap-2">
+                          <p className="text-sm font-medium">قطعات</p>
+                          {draft.parts.map((row, index) => (
+                            <div key={index} className="grid gap-2 sm:grid-cols-[1fr_10rem_auto]">
+                              <input
+                                aria-label={`عنوان قطعهٔ ${index + 1}`}
+                                className={inputClass}
+                                placeholder="عنوان قطعه"
+                                value={row.title}
+                                onChange={(event) => {
+                                  const parts = draft.parts.map((item, at) =>
+                                    at === index ? { ...item, title: event.target.value } : item,
+                                  );
+                                  setDrafts({ ...drafts, [request.id]: { ...draft, parts } });
+                                }}
+                              />
+                              <input
+                                aria-label={`قیمت قطعهٔ ${index + 1}`}
+                                type="number"
+                                className={inputClass}
+                                placeholder="تومان"
+                                value={row.toman}
+                                onChange={(event) => {
+                                  const parts = draft.parts.map((item, at) =>
+                                    at === index ? { ...item, toman: event.target.value } : item,
+                                  );
+                                  setDrafts({ ...drafts, [request.id]: { ...draft, parts } });
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="min-h-11 rounded-lg border border-ink-200 px-3 text-sm text-ink-600 hover:bg-ink-100 disabled:opacity-40"
+                                disabled={draft.parts.length === 1}
+                                onClick={() => {
+                                  const parts = draft.parts.filter((_, at) => at !== index);
+                                  setDrafts({ ...drafts, [request.id]: { ...draft, parts } });
+                                }}
+                              >
+                                حذف
+                              </button>
+                            </div>
+                          ))}
+                          <div>
+                            <button
+                              type="button"
+                              className="min-h-9 rounded-md border border-ink-200 px-3 py-1 text-xs font-semibold hover:bg-ink-100"
+                              onClick={() =>
+                                setDrafts({
+                                  ...drafts,
+                                  [request.id]: {
+                                    ...draft,
+                                    parts: [...draft.parts, { title: "", toman: "" }],
+                                  },
+                                })
+                              }
+                            >
+                              افزودن قطعه
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                        <Field label="عنوان قطعه" htmlFor={`pt-${request.id}`}>
-                          <input
-                            id={`pt-${request.id}`}
-                            className={inputClass}
-                            value={draft.partTitle}
-                            onChange={(event) =>
-                              setDrafts({
-                                ...drafts,
-                                [request.id]: { ...draft, partTitle: event.target.value },
-                              })
-                            }
-                          />
-                        </Field>
-                        <Field label="قیمت قطعه (تومان)" htmlFor={`pa-${request.id}`}>
-                          <input
-                            id={`pa-${request.id}`}
-                            type="number"
-                            className={inputClass}
-                            value={draft.partToman}
-                            onChange={(event) =>
-                              setDrafts({
-                                ...drafts,
-                                [request.id]: { ...draft, partToman: event.target.value },
-                              })
-                            }
-                          />
-                        </Field>
                         <Field label="زمان کار (دقیقه)" htmlFor={`m-${request.id}`}>
                           <input
                             id={`m-${request.id}`}
@@ -359,7 +452,9 @@ export default function SpecialistPage() {
                         مبلغ کل تقریبی:{" "}
                         <strong>
                           {toman(
-                            Number(draft.partToman) +
+                            (draft.offerType === "diagnostic"
+                              ? 0
+                              : draft.parts.reduce((sum, row) => sum + Number(row.toman || 0), 0)) +
                               Math.round((Number(draft.minutes) * Number(draft.hourlyRate)) / 60),
                           )}
                         </strong>
