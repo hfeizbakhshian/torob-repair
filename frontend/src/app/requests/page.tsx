@@ -89,6 +89,14 @@ export default function MyRequestsPage() {
                     مهلت پیشنهاد: {relativeDeadline(request.responseDeadline, now)}
                   </span>
                 )}
+                {request.status === "draft" && !request.publishedAt && (
+                  <Link
+                    href={`/requests/new?resume=${request.id}`}
+                    className="min-h-9 rounded-md bg-brand-500 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-600"
+                  >
+                    ادامهٔ ثبت درخواست
+                  </Link>
+                )}
                 {DELETABLE.has(request.status) &&
                   (confirming === request.id ? (
                     <span className="flex items-center gap-2 text-xs">

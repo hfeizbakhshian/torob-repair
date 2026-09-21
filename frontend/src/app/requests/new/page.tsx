@@ -47,6 +47,12 @@ type Step = "describe" | "pay" | "questions" | "summary";
 
 export default function NewRequestPage() {
   const router = useRouter();
+  // Read on the client rather than through useSearchParams, which would force this whole
+  // page behind a Suspense boundary just to pick up an optional query parameter.
+  const [resumeId, setResumeId] = useState<string | null>(null);
+  useEffect(() => {
+    setResumeId(new URLSearchParams(window.location.search).get("resume"));
+  }, []);
   const [services, setServices] = useState<ServiceTemplateOut[] | null>(null);
   const [serviceCode, setServiceCode] = useState("");
   const [district, setDistrict] = useState("تهرانسر");
@@ -59,6 +65,7 @@ export default function NewRequestPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [isDemoAnswer, setIsDemoAnswer] = useState(true);
   const [step, setStep] = useState<Step>("describe");
+  const [asking, setAsking] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -124,11 +131,25 @@ export default function NewRequestPage() {
         idempotencyKey: key,
       });
       setStep("questions");
-      const result = await api<AiRunOut>(`/api/requests/${request.id}/ai/questions`, {
-        method: "POST",
-      });
-      setIsDemoAnswer(result.isDemoResponse);
-      setQuestions(((result.payload?.questions ?? []) as Question[]) ?? []);
+      setAsking(true);
+      try {
+        const result = await api<AiRunOut>(`/api/requests/${request.id}/ai/questions`, {
+          method: "POST",
+        });
+        setIsDemoAnswer(result.isDemoResponse);
+        const asked = (result.payload?.questions ?? []) as Question[];
+        if (asked.length === 0) {
+          throw new ApiError(0, {
+            code: "SERVICE_UNAVAILABLE",
+            message:
+              result.message ??
+              "پرسشی از مدل دریافت نشد. پیش‌نویس شما محفوظ است و می‌توانید دوباره تلاش کنید.",
+          });
+        }
+        setQuestions(asked);
+      } finally {
+        setAsking(false);
+      }
     });
 
   const buildSummary = () =>
@@ -158,6 +179,36 @@ export default function NewRequestPage() {
       });
       router.push(`/requests/${published.id}`);
     });
+
+  // Picking a half-finished draft back up: the questions were already asked and paid
+  // for, so they are read back rather than asked again.
+  useEffect(() => {
+    if (!resumeId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const existing = await api<RequestOut>(`/api/requests/${resumeId}`);
+        if (cancelled || existing.status !== "draft") return;
+        setRequest(existing);
+        const asked = await api<AiRunOut | null>(
+          `/api/requests/${resumeId}/ai/questions`,
+        ).catch(() => null);
+        if (cancelled) return;
+        const list = (asked?.payload?.questions ?? []) as Question[];
+        if (list.length > 0) {
+          setQuestions(list);
+          setStep("questions");
+        } else {
+          setStep("pay");
+        }
+      } catch (problem) {
+        if (!cancelled) setError(problem as ApiError);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeId]);
 
   const canDescribe = serviceCode !== "" && symptoms.trim().length > 4 && coverage?.supported;
   const selectedService = useMemo(
@@ -291,6 +342,16 @@ export default function NewRequestPage() {
               </Button>
             </div>
           )}
+        </Card>
+      )}
+
+      {asking && (
+        <Card title="۳. پرسش‌های لازم">
+          <Spinner />
+          <p className="mt-2 text-center text-sm text-ink-500">
+            در حال آماده‌سازی پرسش‌ها با هوش مصنوعی — معمولاً چند ثانیه طول می‌کشد. این
+            صفحه را نبندید؛ پیش‌نویس شما ثبت شده و در «پرونده‌های من» هست.
+          </p>
         </Card>
       )}
 

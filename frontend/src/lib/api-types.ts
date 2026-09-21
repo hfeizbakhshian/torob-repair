@@ -657,7 +657,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Last Questions
+         * @description The questions already asked, so leaving the page does not strand the draft.
+         *
+         *     Reading back an answer that was already paid for costs no turn and runs no model.
+         */
+        get: operations["last_questions_api_requests__request_id__ai_questions_get"];
         put?: never;
         /**
          * Ask Questions
@@ -5521,6 +5527,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiRunOut"];
+                };
+            };
+            /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description NOT_FOUND — مورد خواسته‌شده وجود ندارد */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VERSION_CONFLICT یا INVALID_STATE */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VALIDATION_ERROR — ورودی معتبر نیست */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description QUOTA_EXCEEDED — سقف مصرف پر شده است */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description SERVICE_UNAVAILABLE — سرویس در دسترس نیست */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    last_questions_api_requests__request_id__ai_questions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiRunOut"] | null;
                 };
             };
             /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */

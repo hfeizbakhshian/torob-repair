@@ -7621,6 +7621,106 @@
       }
     },
     "/api/requests/{request_id}/ai/questions": {
+      "get": {
+        "description": "The questions already asked, so leaving the page does not strand the draft.\n\nReading back an answer that was already paid for costs no turn and runs no model.",
+        "operationId": "last_questions_api_requests__request_id__ai_questions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AiRunOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Last Questions Api Requests  Request Id  Ai Questions Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_FOUND — مورد خواسته‌شده وجود ندارد"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VERSION_CONFLICT یا INVALID_STATE"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR — ورودی معتبر نیست"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "QUOTA_EXCEEDED — سقف مصرف پر شده است"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "SERVICE_UNAVAILABLE — سرویس در دسترس نیست"
+          }
+        },
+        "summary": "Last Questions",
+        "tags": [
+          "ai"
+        ]
+      },
       "post": {
         "description": "Stage one, turn one: every necessary question at once, mostly multiple choice.",
         "operationId": "ask_questions_api_requests__request_id__ai_questions_post",

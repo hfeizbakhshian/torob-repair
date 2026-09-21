@@ -450,3 +450,38 @@ async def test_resetting_the_demo_clock_does_not_strand_queued_work(client: Asyn
         assert job.status is JobStatus.pending
         # Due now, not two days in the future.
         assert job.run_at <= clock.now()
+
+
+async def test_asked_questions_can_be_read_back_without_spending_a_turn(
+    client: AsyncClient,
+):
+    """Leaving the page must not strand a paid-for draft."""
+    await sign_in(client, "customer-sahar")
+    created = await client.post(
+        "/api/requests",
+        json={
+            "city": factories.CITY,
+            "district": "تهرانسر",
+            "vehicleCode": factories.VEHICLE,
+            "serviceCode": factories.CLUTCH,
+            "symptoms": "صدای غیرعادی هنگام درگیر شدن کلاچ",
+        },
+    )
+    request_id = created.json()["id"]
+
+    empty = await client.get(f"/api/requests/{request_id}/ai/questions")
+    assert empty.status_code == 200 and empty.json() is None
+
+    asked = await client.post(f"/api/requests/{request_id}/ai/questions")
+    assert asked.status_code == 200
+    questions = asked.json()["payload"]["questions"]
+    assert questions
+
+    again = await client.get(f"/api/requests/{request_id}/ai/questions")
+    assert again.json()["payload"]["questions"] == questions
+
+    usage = (await client.get(f"/api/requests/{request_id}/ai/usage")).json()
+    repeat = await client.get(f"/api/requests/{request_id}/ai/questions")
+    assert repeat.status_code == 200
+    # Reading back changed no counter: it ran no model and used no turn.
+    assert (await client.get(f"/api/requests/{request_id}/ai/usage")).json() == usage

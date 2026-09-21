@@ -14,7 +14,7 @@ from app.domain.ai_service import AiOutcome
 from app.domain.errors import forbidden, not_found
 from app.domain.requests import get_request
 from app.models import AiRun, BudgetReservation, Selection
-from app.models.enums import AiStage
+from app.models.enums import AiPurpose, AiRunStatus, AiStage
 from app.schemas.api import (
     AiBudgetOut,
     AiRunOut,
@@ -39,6 +39,39 @@ def _to_out(outcome: AiOutcome) -> AiRunOut:
         payload=outcome.payload,
         error_code=outcome.error_code,
         message=outcome.message,
+        is_demo_response=settings.ai_mode == "mock",
+    )
+
+
+@router.get("/requests/{request_id}/ai/questions", response_model=AiRunOut | None)
+async def last_questions(
+    request_id: uuid.UUID, session: SessionDep, customer: CustomerDep
+) -> AiRunOut | None:
+    """The questions already asked, so leaving the page does not strand the draft.
+
+    Reading back an answer that was already paid for costs no turn and runs no model.
+    """
+    request = await get_request(session, request_id)
+    if request.customer_id != customer.user_id:
+        raise forbidden("این درخواست متعلق به حساب شما نیست.")
+    run = (
+        await session.execute(
+            select(AiRun)
+            .where(
+                AiRun.request_id == request_id,
+                AiRun.purpose == AiPurpose.clarify_questions,
+                AiRun.status == AiRunStatus.succeeded,
+            )
+            .order_by(AiRun.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if run is None or run.output_payload is None:
+        return None
+    return AiRunOut(
+        run_id=run.id,
+        status=run.status.value,
+        payload=run.output_payload,
         is_demo_response=settings.ai_mode == "mock",
     )
 
