@@ -13,6 +13,7 @@ import {
   toman,
   type OfferOut,
   type RequestOut,
+  type ServiceTemplateOut,
   type SelectionOut,
 } from "@/lib/api";
 import { CaseAssistant } from "@/components/case-assistant";
@@ -34,6 +35,8 @@ type Part = { title: string; toman: string };
 type Draft = {
   offerType: string;
   parts: Part[];
+  diagnosticFee: string;
+  diagnosticScope: string;
   minutes: string;
   hourlyRate: string;
   scheduledAt: string;
@@ -47,6 +50,8 @@ function defaultDraft(request: RequestOut): Draft {
     // The service decides which kinds of offer it accepts; the form follows it.
     offerType: request.version?.allowedOfferTypes?.[0] ?? "fixed",
     parts: [{ title: "کیت کلاچ کامل", toman: "4200000" }],
+    diagnosticFee: "900000",
+    diagnosticScope: "بررسی و تعیین علت؛ تعمیر یا تعویض قطعه جداگانه توافق می‌شود.",
     minutes: "180",
     hourlyRate: "400000",
     scheduledAt: scheduled.toISOString().slice(0, 16),
@@ -57,6 +62,7 @@ function defaultDraft(request: RequestOut): Draft {
 export default function SpecialistPage() {
   const [requests, setRequests] = useState<RequestOut[] | null>(null);
   const [cases, setCases] = useState<RequestOut[]>([]);
+  const [services, setServices] = useState<Record<string, string>>({});
   const [offers, setOffers] = useState<OfferOut[]>([]);
   const [selections, setSelections] = useState<Record<string, SelectionOut | null>>({});
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -66,6 +72,8 @@ export default function SpecialistPage() {
 
   const load = useCallback(async () => {
     try {
+      const catalogue = await api<ServiceTemplateOut[]>("/api/catalog/services");
+      setServices(Object.fromEntries(catalogue.map((item) => [item.code, item.titleFa])));
       const list = await api<RequestOut[]>("/api/specialist/requests");
       setRequests(list);
       // A case leaves the open feed once it is assigned, so it is fetched separately.
@@ -138,7 +146,7 @@ export default function SpecialistPage() {
         operationCode: "main",
         minutes,
         hourlyRateToman: rate,
-        amountToman: laborAmount,
+        amountToman: offerType === "diagnostic" ? Number(draft.diagnosticFee) : laborAmount,
         amountKnown: true,
         suppliedBy: "specialist",
         paidTo: "specialist",
@@ -170,11 +178,9 @@ export default function SpecialistPage() {
             offerType === "conditional"
               ? "مبلغ نهایی پس از بازدید و بر اساس سناریوی محقق‌شده تعیین می‌شود."
               : null,
-          diagnosticFeeToman: offerType === "diagnostic" ? laborAmount : null,
-          diagnosticScope:
-            offerType === "diagnostic"
-              ? "بررسی و تعیین علت؛ تعمیر یا تعویض قطعه جداگانه توافق می‌شود."
-              : null,
+          diagnosticFeeToman:
+            offerType === "diagnostic" ? Number(draft.diagnosticFee) : null,
+          diagnosticScope: offerType === "diagnostic" ? draft.diagnosticScope : null,
           scheduledAt: new Date(draft.scheduledAt).toISOString(),
           validUntil: new Date(deadline.getTime() + 3_600_000 * 48).toISOString(),
           estimatedMinutes: minutes,
@@ -213,7 +219,10 @@ export default function SpecialistPage() {
                 <div key={request.id} className="rounded-lg border border-ink-200 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <p className="font-bold">{request.version?.serviceCode}</p>
+                      <p className="font-bold">
+                        {services[request.version?.serviceCode ?? ""] ??
+                          request.version?.serviceCode}
+                      </p>
                       <p className="text-xs text-ink-500">
                         {request.version?.city} — محلهٔ {request.version?.district} —{" "}
                         {request.version?.vehicleCode}
@@ -320,6 +329,44 @@ export default function SpecialistPage() {
                                 </option>
                               ))}
                             </select>
+                          </Field>
+                        </div>
+                      )}
+
+                      {draft.offerType === "diagnostic" && (
+                        <div className="mt-2 flex flex-col gap-3">
+                          <InfoNote>
+                            این درخواست فقط پیشنهاد عیب‌یابی می‌پذیرد: هزینه و دامنهٔ
+                            بررسی، بدون قطعه. تعمیر یا تعویض قطعه پس از بررسی جداگانه
+                            توافق می‌شود و این مبلغ، قیمت تعمیر کامل نیست.
+                          </InfoNote>
+                          <Field label="هزینهٔ عیب‌یابی (تومان)" htmlFor={`df-${request.id}`}>
+                            <input
+                              id={`df-${request.id}`}
+                              type="number"
+                              className={inputClass}
+                              value={draft.diagnosticFee}
+                              onChange={(event) =>
+                                setDrafts({
+                                  ...drafts,
+                                  [request.id]: { ...draft, diagnosticFee: event.target.value },
+                                })
+                              }
+                            />
+                          </Field>
+                          <Field label="دامنهٔ بررسی" htmlFor={`ds-${request.id}`}>
+                            <textarea
+                              id={`ds-${request.id}`}
+                              rows={2}
+                              className={inputClass}
+                              value={draft.diagnosticScope}
+                              onChange={(event) =>
+                                setDrafts({
+                                  ...drafts,
+                                  [request.id]: { ...draft, diagnosticScope: event.target.value },
+                                })
+                              }
+                            />
                           </Field>
                         </div>
                       )}
@@ -452,10 +499,12 @@ export default function SpecialistPage() {
                         مبلغ کل تقریبی:{" "}
                         <strong>
                           {toman(
-                            (draft.offerType === "diagnostic"
-                              ? 0
-                              : draft.parts.reduce((sum, row) => sum + Number(row.toman || 0), 0)) +
-                              Math.round((Number(draft.minutes) * Number(draft.hourlyRate)) / 60),
+                            draft.offerType === "diagnostic"
+                              ? Number(draft.diagnosticFee || 0)
+                              : draft.parts.reduce((sum, row) => sum + Number(row.toman || 0), 0) +
+                                Math.round(
+                                  (Number(draft.minutes) * Number(draft.hourlyRate)) / 60,
+                                ),
                           )}
                         </strong>
                       </p>
@@ -489,7 +538,9 @@ export default function SpecialistPage() {
                 <div key={request.id} className="rounded-lg border border-ink-200 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <p className="font-bold">{version?.serviceCode}</p>
+                      <p className="font-bold">
+                        {services[version?.serviceCode ?? ""] ?? version?.serviceCode}
+                      </p>
                       <p className="text-xs text-ink-500">
                         {version?.city} — {version?.district}
                       </p>
