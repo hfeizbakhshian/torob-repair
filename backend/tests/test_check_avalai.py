@@ -32,7 +32,7 @@ async def test_persian_smoke_reports_actual_result(
 
     class Provider:
         name = "avalai"
-        model = "deepseek-v4-flash"
+        model = "deepseek-v4.1-flash"
 
         async def complete(self, request):
             calls.append(request)
@@ -79,12 +79,12 @@ def test_existing_smoke_still_uses_english_input():
 
 
 @pytest.mark.parametrize("blocked", [False, True])
-@pytest.mark.parametrize("opus_available", [False, True])
+@pytest.mark.parametrize("all_advertised", [False, True])
 async def test_comparison_continues_after_failure_and_never_falls_back(
-    monkeypatch, capsys, blocked, opus_available
+    monkeypatch, capsys, blocked, all_advertised
 ):
-    models = ("deepseek-v4-flash", "gpt-5.6-sol", "claude-opus-5")
-    advertised = models if opus_available else models[:2]
+    models = check_avalai.COMPARISON_MODELS
+    advertised = models if all_advertised else models[:-1]
     calls = []
     discoveries = []
     original_model = settings.ai_model
@@ -127,7 +127,7 @@ async def test_comparison_continues_after_failure_and_never_falls_back(
     monkeypatch.setattr(check_avalai, "AvalAiProvider", Provider)
     monkeypatch.setattr(check_avalai.httpx, "AsyncClient", client)
     exit_code = await check_avalai.compare_models()
-    assert exit_code == (0 if opus_available and not blocked else 1)
+    assert exit_code == (0 if all_advertised and not blocked else 1)
     assert [model for model, _ in calls] == list(advertised)
     assert len(discoveries) == 1
     assert all(payload == calls[0][1] for _, payload in calls)
@@ -137,9 +137,9 @@ async def test_comparison_continues_after_failure_and_never_falls_back(
     summary = json.loads(output.rsplit("خلاصهٔ مقایسه:\n", 1)[1])
     assert summary["requestsSent"] == len(advertised)
     assert summary["requestedModels"] == list(models)
-    assert summary["unavailableModels"] == ([] if opus_available else ["claude-opus-5"])
+    assert summary["unavailableModels"] == ([] if all_advertised else [models[-1]])
     assert summary["failedModels"] == ([models[0]] if blocked else [])
-    if not opus_available:
+    if not all_advertised:
         assert '"errorCode": "model_not_advertised"' in output
 
 
@@ -158,6 +158,6 @@ def test_persian_command_defaults_to_comparison_and_allows_one_model(monkeypatch
     monkeypatch.setattr(sys, "argv", ["check_avalai_fa", "--live"])
     assert check_avalai.main(input_language="fa", compare=True) == 0
     assert calls[-1] == ("fa", check_avalai.COMPARISON_MODELS)
-    monkeypatch.setattr(sys, "argv", ["check_avalai_fa", "--live", "--model", "claude-opus-5"])
+    monkeypatch.setattr(sys, "argv", ["check_avalai_fa", "--live", "--model", "glm-5.3-flash"])
     assert check_avalai.main(input_language="fa", compare=True) == 0
-    assert calls[-1] == ("fa", ("claude-opus-5",))
+    assert calls[-1] == ("fa", ("glm-5.3-flash",))

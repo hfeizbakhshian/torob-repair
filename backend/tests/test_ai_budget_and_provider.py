@@ -529,7 +529,7 @@ async def test_avalai_response_is_recorded_by_domain_service(session, policy, fa
         return httpx.Response(200, json=body)
 
     provider = AvalAiProvider(
-        api_key="test", base_url="http://avalai.test/v1", model="deepseek-v4-flash",
+        api_key="test", base_url="http://avalai.test/v1", model="deepseek-v4.1-flash",
         transport=httpx.MockTransport(handler),
     )
     outcome = await _run(AiService(provider, policy), request.id)
@@ -537,7 +537,7 @@ async def test_avalai_response_is_recorded_by_domain_service(session, policy, fa
     run = (await session.execute(select(AiRun))).scalars().one()
     reservation = (await session.execute(select(BudgetReservation))).scalars().one()
     assert len(calls) == 1
-    assert run.provider == "avalai" and run.model == "deepseek-v4-flash"
+    assert run.provider == "avalai" and run.model == "deepseek-v4.1-flash"
     if failed:
         assert not outcome.ok
         assert run.error_code == "content_blocked"

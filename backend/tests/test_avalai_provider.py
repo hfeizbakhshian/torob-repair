@@ -40,7 +40,7 @@ async def invoke(body, status=200):
     provider = AvalAiProvider(
         api_key="test-secret",
         base_url="http://avalai.test/v1/",
-        model="deepseek-v4-flash",
+        model="deepseek-v4.1-flash",
         transport=httpx.MockTransport(handler),
     )
     response = await provider.complete(request())
@@ -50,7 +50,7 @@ async def invoke(body, status=200):
     assert "X-AvalAI-Session-Id" not in calls[0].headers
     sent = json.loads(calls[0].content)
     assert set(sent) == {"model", "messages", "stream"}
-    assert sent["model"] == "deepseek-v4-flash"
+    assert sent["model"] == "deepseek-v4.1-flash"
     assert sent["stream"] is False
     return response
 

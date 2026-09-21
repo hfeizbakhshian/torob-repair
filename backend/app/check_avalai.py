@@ -51,7 +51,7 @@ def build_request(input_language: Literal["en", "fa"] = "en") -> AiRequest:
     )
 
 
-COMPARISON_MODELS = ("deepseek-v4-flash", "gpt-5.6-sol", "claude-opus-5")
+COMPARISON_MODELS = ("deepseek-v4.1-flash", "glm-5.3-flash")
 
 
 async def discover_models() -> set[str] | None:
