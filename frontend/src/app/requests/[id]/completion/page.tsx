@@ -13,6 +13,7 @@ import {
   type PriceCheckOut,
 } from "@/lib/api";
 import { LineItems, Totals } from "@/components/line-items";
+import { useSession } from "@/components/session-context";
 import { activeAgreement, loadCase, type CaseBundle } from "@/lib/case";
 import {
   Button,
@@ -45,6 +46,11 @@ export default function CompletionPage() {
   const [checks, setChecks] = useState<PriceCheckOut[]>([]);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  // Each side only sees the decisions that are theirs to make. The server enforces this
+  // too; hiding the other side's buttons is so nobody is offered a choice they do not have.
+  const { user } = useSession();
+  const isCustomer = user?.role === "customer";
+  const isSpecialist = user?.role === "specialist";
   const [expenseText, setExpenseText] = useState("");
   const [rejectReason, setRejectReason] = useState("");
   const [score, setScore] = useState("");
@@ -129,7 +135,7 @@ export default function CompletionPage() {
       {error && <ErrorNote message={error.message} fields={error.fieldErrors} />}
       {!selection && <Empty>هنوز همکاری پذیرفته‌شده‌ای وجود ندارد.</Empty>}
 
-      {selection && (
+      {selection && isSpecialist && (
         <Card
           title="ثبت مخارج از روی متن"
           subtitle="متن شما به اقلام تبدیل می‌شود و پیش از نمایش به مشتری خودتان آن را بازبینی می‌کنید."
@@ -190,7 +196,8 @@ export default function CompletionPage() {
 
           {version.receiptStatus === "pending" &&
             version.submittedAt &&
-            current?.id === version.id && (
+            current?.id === version.id &&
+            isCustomer && (
               <div className="mt-4 flex flex-col gap-3 rounded-lg border border-ink-200 bg-ink-50 p-3">
                 <p className="text-sm font-semibold">
                   تأیید یا رد این نسخه — تصمیم شما فقط به همین نسخه تعلق می‌گیرد.
@@ -309,6 +316,11 @@ export default function CompletionPage() {
                 <InfoNote>
                   پایان کار در {tehranTime(completion.customerConfirmedAt)} تأیید شد.
                 </InfoNote>
+              ) : !isCustomer ? (
+                <InfoNote>
+                  صورت‌حساب برای مشتری ارسال شده و در انتظار تأیید اوست. بی‌پاسخی، تأیید
+                  محسوب نمی‌شود.
+                </InfoNote>
               ) : (
                 <>
                   <Field label="امتیاز رضایت (۱ تا ۵)" htmlFor="score">
@@ -384,7 +396,7 @@ export default function CompletionPage() {
                 متخصص پس از ثبت مخارج، پایان کار را درخواست می‌کند. بی‌پاسخی هیچ‌کدام از
                 طرفین، پایان موفق یا تأیید هزینه محسوب نمی‌شود.
               </InfoNote>
-              <div>
+              <div hidden={!isSpecialist}>
                 <Button
                   variant="secondary"
                   onClick={() =>
@@ -398,7 +410,7 @@ export default function CompletionPage() {
                   disabled={!current?.submittedAt}
                   data-testid="request-completion"
                 >
-                  درخواست پایان کار (متخصص)
+                  درخواست پایان کار
                 </Button>
               </div>
             </div>

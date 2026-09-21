@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, tehranTime, toman, type AgreementOut, type LineItem } from "@/lib/api";
 import { CaseAssistant } from "@/components/case-assistant";
+import { useSession } from "@/components/session-context";
 import { LineItems, Totals } from "@/components/line-items";
 import { activeAgreement, loadCase, pendingAgreement, type CaseBundle } from "@/lib/case";
 import {
@@ -235,6 +236,12 @@ function AgreementCard({
   onReject: () => void;
 }) {
   const approvedBy = agreement.approvedBy;
+  const { user } = useSession();
+  // Writing a version records its author's approval, so they are never asked for it
+  // again — and support reads the case without ever being a party to it.
+  const myParty =
+    user?.role === "customer" ? "customer" : user?.role === "specialist" ? "specialist" : null;
+  const mineAlready = myParty !== null && approvedBy.includes(myParty);
   return (
     <Card
       title={`نسخهٔ ${agreement.versionNumber.toLocaleString("fa-IR")}`}
@@ -271,15 +278,21 @@ function AgreementCard({
         <p className="text-ink-500">شرط داوری: {agreement.arbitrationClause}</p>
       </div>
 
-      {agreement.status === "proposed" && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={onApprove} busy={busy} data-testid={`approve-${agreement.id}`}>
-            تأیید همین نسخه
-          </Button>
-          <Button variant="danger" onClick={onReject} busy={busy}>
-            رد این نسخه
-          </Button>
-        </div>
+      {agreement.status === "proposed" && myParty !== null && (
+        mineAlready ? (
+          <p className="mt-3 text-sm text-ink-500">
+            شما این نسخه را تأیید کرده‌اید؛ تا تأیید طرف مقابل به جریان نمی‌افتد.
+          </p>
+        ) : (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button onClick={onApprove} busy={busy} data-testid={`approve-${agreement.id}`}>
+              تأیید همین نسخه
+            </Button>
+            <Button variant="danger" onClick={onReject} busy={busy}>
+              رد این نسخه
+            </Button>
+          </div>
+        )
       )}
     </Card>
   );

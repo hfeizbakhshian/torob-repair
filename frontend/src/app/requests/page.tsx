@@ -113,11 +113,16 @@ export default function MyRequestsPage() {
                     <button
                       type="button"
                       onClick={() => setConfirming(request.id)}
-                      className="min-h-8 text-xs text-ink-500 underline hover:text-red-600"
+                      className="min-h-9 rounded-md border border-ink-200 px-3 py-1 text-xs font-semibold text-ink-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                     >
-                      حذف از فهرست
+                      حذف درخواست
                     </button>
                   ))}
+                {!DELETABLE.has(request.status) && (
+                  <span className="text-xs text-ink-500">
+                    تا پایان یا لغو کار، حذف ممکن نیست
+                  </span>
+                )}
               </div>
             </div>
           </Card>

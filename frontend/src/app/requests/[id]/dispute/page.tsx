@@ -12,6 +12,7 @@ import {
   type DisputeOut,
 } from "@/lib/api";
 import { LineItems } from "@/components/line-items";
+import { useSession } from "@/components/session-context";
 import { activeAgreement, loadCase, type CaseBundle } from "@/lib/case";
 import {
   Button,
@@ -49,6 +50,9 @@ export default function DisputePage() {
   const [dispute, setDispute] = useState<DisputeOut | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  // Both sides of a case are parties here; support reads the file but is not one of them.
+  const { user } = useSession();
+  const isParty = user?.role === "customer" || user?.role === "specialist";
   const [claimTitle, setClaimTitle] = useState("");
   const [claimAmount, setClaimAmount] = useState("");
   const [claimReason, setClaimReason] = useState("");
@@ -249,7 +253,7 @@ export default function DisputePage() {
               </ul>
             )}
 
-            {["dispute_open", "needs_evidence"].includes(dispute.status) && (
+            {["dispute_open", "needs_evidence"].includes(dispute.status) && isParty && (
               <div className="mt-4 flex flex-col gap-3 rounded-lg border border-ink-200 bg-ink-50 p-3">
                 <Field label="اظهارات شما" htmlFor="statement">
                   <textarea
