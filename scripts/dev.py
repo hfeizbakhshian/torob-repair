@@ -14,6 +14,7 @@ import argparse
 import os
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -98,6 +99,27 @@ def wait_for_http(url: str, *, name: str, timeout: float = 90.0) -> bool:
     return False
 
 
+def port_in_use(host: str, port: str) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(1)
+        return probe.connect_ex((host, int(port))) == 0
+
+
+def check_ports_free(*, with_web: bool) -> bool:
+    """A stale process on our port would answer the health check in our place."""
+    busy = [(API_HOST, API_PORT, "API")]
+    if with_web:
+        busy.append(("127.0.0.1", WEB_PORT, "رابط وب"))
+    taken = [(port, name) for host, port, name in busy if port_in_use(host, port)]
+    for port, name in taken:
+        print(
+            f"✗ پورت {port} ({name}) از قبل اشغال است. احتمالاً اجرای قبلی هنوز زنده است؛ "
+            "آن را ببندید یا با API_PORT/WEB_PORT پورت دیگری بدهید.",
+            file=sys.stderr,
+        )
+    return not taken
+
+
 def start_database() -> None:
     docker = shutil.which("docker")
     if docker is None:
@@ -125,6 +147,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    if not check_ports_free(with_web=not args.no_web):
+        return 1
+
     if args.with_db:
         start_database()
 
@@ -143,7 +168,7 @@ def main() -> int:
 
     try:
         services[0].start()
-        if not wait_for_http(API_HEALTH, name="API"):
+        if not wait_for_http(API_HEALTH, name="API") or services[0].poll_failure():
             print(
                 "راهنمایی: آیا migration اجرا شده است؟ "
                 "`uv run alembic upgrade head` را در backend/ اجرا کنید.",
