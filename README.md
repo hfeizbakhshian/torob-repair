@@ -11,6 +11,77 @@
 
 ---
 
+## راهنمای سریع: اجرا و آزمون
+
+سه مسیر مستقل. هر سه از ریشهٔ مخزن شروع می‌شوند و جزئیات هرکدام در بخش‌های بعدی است.
+
+### الف) اجرای دمو بدون کلید مدل
+
+بار اول، به همین ترتیب:
+
+```bash
+cp .env.example .env
+docker compose up -d db
+cd backend && uv sync --locked
+uv run alembic upgrade head
+uv run python -m app.seed
+cd ../frontend && npm ci && npm run api:types
+```
+
+سپس هر بار، از ریشهٔ مخزن، فقط:
+
+```bash
+uv run --project backend python scripts/dev.py --with-db
+```
+
+این دستور API، worker و رابط را با هم بالا می‌آورد. رابط روی
+<http://127.0.0.1:3000> است. در صفحهٔ ورود، `customer-sahar` را انتخاب کنید و یک درخواست
+تعمیر بسازید؛ برای دیدن سمت متخصص، در مرورگر دیگری با `specialist-arya` وارد شوید.
+`AI_MODE=mock` پیش‌فرض است، پس پاسخ‌های دستیار نمایشی‌اند و هیچ کلید یا تماس پولی لازم نیست.
+برای توقف، `Ctrl+C`؛ پایگاه داده با `docker compose down` خاموش می‌شود.
+
+### ب) اجرا با AI واقعی (AvalAI)
+
+در `.env` ریشه این چهار مقدار را بگذارید و بقیه را دست نزنید:
+
+```dotenv
+AI_MODE=live
+AI_API_KEY=...
+AI_ENFORCE_COST_CAP=false
+WORKER_LEASE_SECONDS=600
+```
+
+`AI_PROVIDER=avalai`، `AI_MODEL=glm-5.3-flash` و آدرس درگاه از پیش‌فرض برنامه می‌آیند.
+پیش از اجرای محصول، اتصال را جدا بسنجید — این دستور یک درخواست واقعی می‌فرستد:
+
+```bash
+cd backend && uv run python -m app.check_avalai --live
+```
+
+اگر `smokePassed: true` دید، `scripts/dev.py` را دوباره اجرا کنید تا API و worker با
+تنظیمات تازه بالا بیایند. `AI_ENFORCE_COST_CAP=false` فقط کنترل هزینهٔ روزانه را برمی‌دارد؛
+سهمیهٔ نوبت و توکن هر پرونده سر جایش است. جزئیات در [اتصال درگاه AvalAI](#اتصال-درگاه-avalai).
+
+### ج) آزمون
+
+هیچ‌کدام کلید مدل یا تماس پولی لازم ندارند:
+
+```bash
+docker compose --profile test up -d db-test
+cd backend
+uv run alembic -x test=true upgrade head   # فقط بار اول
+uv run pytest                              # ۲۰۴ تست
+uv run ruff check . && uv run mypy app
+cd ../frontend && npm run test:e2e         # Playwright، پایگاه و پورت مجزای خودش
+```
+
+`uv run pytest` حدود دو دقیقه طول می‌کشد و به پایگاه تست روی پورت ۵۴۳۸ نیاز دارد. برای یک
+فایل مشخص: `uv run pytest tests/test_avalai_provider.py`. تنظیمات AI در تست‌ها همیشه روی
+mock قفل می‌شود، حتی اگر `.env` شما live باشد. فهرست کامل در
+[آزمون و کنترل کیفیت](#آزمون-و-کنترل-کیفیت).
+
+---
+
 ## پیش‌نیازها
 
 | ابزار | نسخه | توضیح |
@@ -136,7 +207,8 @@ AI_DAILY_COST_CAP_TOMAN=...        # سقف روزانهٔ کل نصب؛ صفر 
 ### اتصال درگاه AvalAI
 
 تنظیمات زیر را در `.env` ریشه قرار دهید؛ کلید، کلید شخصی حساب AvalAI است و فقط در
-بک‌اند می‌ماند:
+بک‌اند می‌ماند. `AI_PROVIDER`، `AI_MODEL` و `AI_BASE_URL` همین مقادیر را به‌صورت پیش‌فرض
+دارند و نوشتنشان فقط برای صراحت است؛ `AI_MODE` و `AI_API_KEY` واقعاً لازم‌اند:
 
 ```dotenv
 AI_MODE=live

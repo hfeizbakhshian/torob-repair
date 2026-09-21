@@ -45,8 +45,8 @@ class Settings(BaseSettings):
 
     # --- AI ---------------------------------------------------------------
     ai_mode: Literal["mock", "live"] = "mock"
-    ai_provider: Literal["deepseek", "avalai"] = "deepseek"
-    ai_model: str = "deepseek-flash"
+    ai_provider: Literal["deepseek", "avalai"] = "avalai"
+    ai_model: str = "glm-5.3-flash"
     ai_api_key: str | None = None
     ai_base_url: str | None = None
     ai_request_timeout_seconds: float = 45.0
