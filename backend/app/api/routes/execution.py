@@ -83,6 +83,11 @@ async def submit_expense(
         extracted_by_ai=payload.extracted_by_ai,
         expected_revision=payload.expected_revision,
     )
+    if payload.final:
+        # One statement from the specialist: this is the invoice, and the work is done.
+        await service.request_completion(
+            session, selection_id=selection_id, specialist_id=specialist.user_id
+        )
     return await expense_version_out(session, version)
 
 
@@ -138,6 +143,9 @@ async def review_receipt(
         customer_id=customer.user_id,
         approve=payload.approve,
         reason=payload.reason,
+        satisfaction_score=payload.satisfaction_score,
+        satisfaction_note=payload.satisfaction_note,
+        reference_consent=payload.reference_consent,
     )
     version = await session.get(ExpenseVersion, version_id)
     if version is None:

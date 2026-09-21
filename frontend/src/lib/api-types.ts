@@ -998,7 +998,7 @@ export interface paths {
         put?: never;
         /**
          * Accept Selection
-         * @description Acceptance opens the working chat — but is still not permission to repair.
+         * @description Acceptance opens the working chat, and puts a fixed offer's terms in force.
          */
         post: operations["accept_selection_api_selections__selection_id__accept_post"];
         delete?: never;
@@ -1647,6 +1647,8 @@ export interface components {
             city: string;
             /** District */
             district: string;
+            /** Idempotencykey */
+            idempotencyKey?: string | null;
             /** Servicecode */
             serviceCode: string;
             /** Symptoms */
@@ -2313,6 +2315,15 @@ export interface components {
             approve: boolean;
             /** Reason */
             reason?: string | null;
+            /**
+             * Referenceconsent
+             * @default false
+             */
+            referenceConsent: boolean;
+            /** Satisfactionnote */
+            satisfactionNote?: string | null;
+            /** Satisfactionscore */
+            satisfactionScore?: number | null;
         };
         /**
          * ReceiptStatus
@@ -2679,6 +2690,11 @@ export interface components {
              * @default false
              */
             extractedByAi: boolean;
+            /**
+             * Final
+             * @default false
+             */
+            final: boolean;
             /** Lines */
             lines?: components["schemas"]["LineItem"][];
             /** Sourcetext */

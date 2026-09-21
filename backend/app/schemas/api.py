@@ -120,6 +120,8 @@ class CreateRequestInput(ApiModel):
     service_code: str = Field(max_length=60)
     symptoms: str = Field(min_length=1, max_length=2000)
     visit_mode: str = Field(default="shop", max_length=30)
+    idempotency_key: str | None = Field(default=None, max_length=120)
+    """When given, the registration fee is settled in the same call."""
 
 
 class PayInput(ApiModel):
@@ -361,6 +363,8 @@ class SubmitExpenseInput(ApiModel):
     source_text: str | None = Field(default=None, max_length=4000)
     actual_minutes: int | None = Field(default=None, ge=0, le=100_000)
     extracted_by_ai: bool = False
+    final: bool = False
+    """A final invoice also ends the work and asks the customer to close the case."""
     expected_revision: int | None = None
 
 
@@ -371,6 +375,10 @@ class ReviewExtractionInput(ApiModel):
 class ReceiptDecisionInput(ApiModel):
     approve: bool
     reason: str | None = Field(default=None, max_length=600)
+    satisfaction_score: int | None = Field(default=None, ge=1, le=5)
+    satisfaction_note: str | None = Field(default=None, max_length=600)
+    reference_consent: bool = False
+    """Carried through when approving a final invoice, which also closes the case."""
 
 
 class ExpenseVersionOut(ApiModel):

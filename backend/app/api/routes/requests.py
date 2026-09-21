@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from contextlib import suppress
 
 from fastapi import APIRouter, Header
 from sqlalchemy import select
@@ -10,7 +11,7 @@ from sqlalchemy import select
 from app.api.deps import CustomerDep, PolicyDep, SessionDep, UserDep
 from app.api.serializers import payment_out, request_out
 from app.domain import requests as service
-from app.domain.errors import forbidden, not_found
+from app.domain.errors import DomainError, forbidden, not_found
 from app.domain.selection import active_selection
 from app.models import Payment, Request
 from app.models.enums import PaymentStatus, Role
@@ -28,7 +29,10 @@ router = APIRouter(prefix="/requests", tags=["requests"])
 
 @router.post("", response_model=RequestOut, status_code=201)
 async def create_request(
-    payload: CreateRequestInput, session: SessionDep, customer: CustomerDep
+    payload: CreateRequestInput,
+    session: SessionDep,
+    customer: CustomerDep,
+    policy: PolicyDep,
 ) -> RequestOut:
     request = await service.create_draft(
         session,
@@ -41,6 +45,16 @@ async def create_request(
         symptoms=payload.symptoms,
         visit_mode=payload.visit_mode,
     )
+    if payload.idempotency_key is not None:
+        # A refused payment leaves the draft alone; the customer retries through /pay.
+        with suppress(DomainError):
+            await service.pay_registration_fee(
+                session,
+                request_id=request.id,
+                customer_id=customer.user_id,
+                idempotency_key=payload.idempotency_key,
+                policy=policy,
+            )
     return await request_out(session, request)
 
 

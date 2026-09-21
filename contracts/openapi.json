@@ -746,6 +746,18 @@
             "title": "District",
             "type": "string"
           },
+          "idempotencyKey": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotencykey"
+          },
           "serviceCode": {
             "maxLength": 60,
             "title": "Servicecode",
@@ -2855,6 +2867,36 @@
               }
             ],
             "title": "Reason"
+          },
+          "referenceConsent": {
+            "default": false,
+            "title": "Referenceconsent",
+            "type": "boolean"
+          },
+          "satisfactionNote": {
+            "anyOf": [
+              {
+                "maxLength": 600,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfactionnote"
+          },
+          "satisfactionScore": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfactionscore"
           }
         },
         "required": [
@@ -3896,6 +3938,11 @@
           "extractedByAi": {
             "default": false,
             "title": "Extractedbyai",
+            "type": "boolean"
+          },
+          "final": {
+            "default": false,
+            "title": "Final",
             "type": "boolean"
           },
           "lines": {
@@ -9893,7 +9940,7 @@
     },
     "/api/selections/{selection_id}/accept": {
       "post": {
-        "description": "Acceptance opens the working chat — but is still not permission to repair.",
+        "description": "Acceptance opens the working chat, and puts a fixed offer's terms in force.",
         "operationId": "accept_selection_api_selections__selection_id__accept_post",
         "parameters": [
           {

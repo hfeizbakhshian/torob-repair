@@ -184,9 +184,14 @@ async def review_receipt(
     customer_id: uuid.UUID,
     approve: bool,
     reason: str | None,
+    satisfaction_score: int | None = None,
+    satisfaction_note: str | None = None,
+    reference_consent: bool = False,
 ) -> ReceiptReview:
     """The customer's explicit verdict on this exact version, item list and files.
 
+    Approving an invoice the specialist marked as final also closes the case: to the
+    customer that is one decision, and the confirmation still lands on this exact version.
     Rejection opens the correction or dispute path; it never forces a confirmation, and an
     AI ruling later on cannot turn a rejected receipt into a confirmed one.
     """
@@ -232,6 +237,25 @@ async def review_receipt(
         subject_id=version.id,
         reason=reason,
     )
+
+    if approve:
+        completion = (
+            await session.execute(
+                select(Completion).where(Completion.selection_id == expense.selection_id)
+            )
+        ).scalar_one_or_none()
+        if completion is not None and completion.requested_at is not None:
+            # confirm_completion re-reads the confirmed version, so make this one visible.
+            await session.flush()
+            await confirm_completion(
+                session,
+                selection_id=expense.selection_id,
+                customer_id=customer_id,
+                expected_revision=None,
+                satisfaction_score=satisfaction_score,
+                satisfaction_note=satisfaction_note,
+                reference_consent=reference_consent,
+            )
     return review
 
 

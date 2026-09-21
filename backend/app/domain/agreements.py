@@ -186,6 +186,18 @@ async def propose_version(
     session.add(agreement)
     await session.flush()
 
+    # Writing the terms is an explicit statement of agreement to them, not silence, so the
+    # author never has to approve their own draft a second time. The other side still must.
+    session.add(
+        Approval(
+            agreement_version_id=agreement.id,
+            party=party,
+            user_id=actor_id,
+            approved_at=now(),
+        )
+    )
+    await session.flush()
+
     await jobs.schedule(
         session,
         JobKind.expire_agreement,

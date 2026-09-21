@@ -393,7 +393,18 @@ async def publish(
 
     version = await current_version(session, request)
     if version.summary_confirmed_at is None:
-        raise invalid_state("پیش از انتشار باید خلاصهٔ درخواست را تأیید کنید.")
+        # Publishing *is* the customer's confirmation of the summary they are looking at:
+        # one intent, one button. The summary itself still has to exist.
+        if not version.summary_facts:
+            raise invalid_state("ابتدا خلاصهٔ درخواست باید ساخته شود.")
+        version.summary_confirmed_at = now()
+        await audit.record(
+            session,
+            "summary_confirmed",
+            request_id=request.id,
+            actor_id=customer_id,
+            actor_role="customer",
+        )
     if not await has_successful_payment(session, request.id):
         raise invalid_state("پرداخت آزمایشی ثبت درخواست هنوز موفق نشده است.")
 

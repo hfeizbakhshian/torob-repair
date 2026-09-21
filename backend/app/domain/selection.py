@@ -9,9 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import now
+from app.domain import agreements as agreements_service
 from app.domain import audit, jobs
 from app.domain import offers as offers_service
 from app.domain.errors import forbidden, invalid_state, not_found
+from app.domain.money import LineItem
 from app.models import (
     AgreementVersion,
     Offer,
@@ -24,6 +26,7 @@ from app.models.enums import (
     CloseReason,
     JobKind,
     OfferStatus,
+    OfferType,
     RequestStatus,
     SelectionStatus,
 )
@@ -137,11 +140,14 @@ async def accept_selection(
     specialist_id: uuid.UUID,
     expected_revision: int | None,
     accepted_arbitration: bool,
+    policy: Policy,
 ) -> Selection:
     """The specialist's acceptance. Only after this does their working chat open.
 
-    Acceptance alone is not permission to repair — that still needs an agreement version
-    both sides approve.
+    For a fixed offer this also puts the first agreement in force, because both sides have
+    already stated those exact terms: the specialist wrote them and the customer picked
+    them. A conditional or diagnostic offer still needs a concrete version after the
+    inspection, since its amount depends on what is found.
     """
     selection = await lock_row(session, Selection, selection_id)
     if selection.specialist_id != specialist_id:
@@ -179,6 +185,28 @@ async def accept_selection(
         actor_role="specialist",
         subject_id=selection.id,
     )
+
+    offer_version = await session.get(OfferVersion, selection.offer_version_id)
+    if offer_version is not None and offer_version.offer_type is OfferType.fixed:
+        agreement = await agreements_service.propose_version(
+            session,
+            selection_id=selection.id,
+            actor_id=specialist_id,
+            lines=[LineItem.model_validate(line) for line in offer_version.lines],
+            scenarios=[],
+            scheduled_at=selection.scheduled_at,
+            warranty_note=offer_version.warranty_note,
+            change_reason=None,
+            evidence_ids=[],
+            policy=policy,
+        )
+        # The customer approved these terms by selecting this offer version.
+        await agreements_service.approve_version(
+            session,
+            agreement_id=agreement.id,
+            actor_id=request.customer_id,
+            expected_revision=None,
+        )
     return selection
 
 

@@ -85,14 +85,16 @@ async def accept_selection(
     payload: AcceptSelectionInput,
     session: SessionDep,
     specialist: SpecialistDep,
+    policy: PolicyDep,
 ) -> SelectionOut:
-    """Acceptance opens the working chat — but is still not permission to repair."""
+    """Acceptance opens the working chat, and puts a fixed offer's terms in force."""
     selection = await selection_service.accept_selection(
         session,
         selection_id=selection_id,
         specialist_id=specialist.user_id,
         expected_revision=payload.expected_revision,
         accepted_arbitration=payload.accepted_arbitration,
+        policy=policy,
     )
     return selection_out(selection)
 

@@ -194,6 +194,7 @@ async def accepted_collaboration(
         specialist_id=specialist.id,
         expected_revision=selection.revision,
         accepted_arbitration=True,
+        policy=policy,
     )
     await session.commit()
     return selection
