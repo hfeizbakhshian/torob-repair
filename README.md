@@ -14,6 +14,7 @@
 ## راهنمای سریع: اجرا و آزمون
 
 سه مسیر مستقل. هر سه از ریشهٔ مخزن شروع می‌شوند و جزئیات هرکدام در بخش‌های بعدی است.
+پیش از شروع، `uv`، Node و Docker باید در دسترس باشند — [پیش‌نیازها](#پیشنیازها).
 
 ### الف) اجرای دمو بدون کلید مدل
 
@@ -22,7 +23,7 @@
 ```bash
 cp .env.example .env
 docker compose up -d db
-cd backend && uv sync --locked
+cd backend && uv sync --locked --extra dev
 uv run alembic upgrade head
 uv run python -m app.seed
 cd ../frontend && npm ci && npm run api:types
@@ -92,6 +93,11 @@ mock قفل می‌شود، حتی اگر `.env` شما live باشد. فهرس�
 
 نصب uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
+`uv` باید در PATH باشد؛ اگر `Command 'uv' not found` دیدید، پوشهٔ نصب (معمولاً
+`~/.local/bin`) در PATH نیست. `scripts/dev.py` هم درون خودش `uv run` صدا می‌زند، پس بدون
+آن اجرا نمی‌شود. `npm ci` روی Node 22 هشدار `EBADENGINE` می‌دهد؛ ساخت و اجرای رابط با آن
+آزموده شده و کار می‌کند، ولی نسخهٔ مبنای پروژه ۲۴ است.
+
 ---
 
 ## اولین راه‌اندازی، گام به گام
@@ -107,7 +113,7 @@ cp .env.example .env          # نیازی به کلید مدل نیست
 docker compose up -d db
 
 # ۲) وابستگی‌های بک‌اند
-cd backend && uv sync --locked
+cd backend && uv sync --locked --extra dev
 
 # ۳) ساخت schema — همیشه صریح و پیش از اجرای API و worker
 uv run alembic upgrade head

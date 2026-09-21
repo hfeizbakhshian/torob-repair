@@ -84,9 +84,11 @@ class Service:
 
 def wait_for_http(url: str, *, name: str, timeout: float = 90.0) -> bool:
     deadline = time.monotonic() + timeout
+    # A local service is never reached through a proxy, whatever the shell exports.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(url, timeout=2) as response:
+            with opener.open(url, timeout=2) as response:
                 if response.status < 500:
                     print(f"✓ {name} آماده است: {url}")
                     return True
