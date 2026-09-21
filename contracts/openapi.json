@@ -11378,6 +11378,92 @@
         ]
       }
     },
+    "/api/specialist/cases": {
+      "get": {
+        "description": "The cases this specialist was chosen for, whatever stage they have reached.\n\nA request leaves the open feed the moment it is assigned, so without this the\nspecialist would lose the case in the same moment they accepted it.",
+        "operationId": "my_cases_api_specialist_cases_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RequestOut"
+                  },
+                  "title": "Response My Cases Api Specialist Cases Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "NOT_FOUND — مورد خواسته‌شده وجود ندارد"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VERSION_CONFLICT یا INVALID_STATE"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR — ورودی معتبر نیست"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "QUOTA_EXCEEDED — سقف مصرف پر شده است"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "SERVICE_UNAVAILABLE — سرویس در دسترس نیست"
+          }
+        },
+        "summary": "My Cases",
+        "tags": [
+          "offers"
+        ]
+      }
+    },
     "/api/specialist/offers": {
       "get": {
         "operationId": "my_offers_api_specialist_offers_get",

@@ -15,8 +15,8 @@ from app.domain.auth import specialist_profile
 from app.domain.comparison import ComparableOffer, SortKey, group_by_scenario, sort_offers
 from app.domain.errors import forbidden, not_found
 from app.domain.money import LineItem, Totals, compute_totals
-from app.models import Offer, OfferVersion, Request
-from app.models.enums import Role
+from app.models import Offer, OfferVersion, Request, Selection
+from app.models.enums import Role, SelectionStatus
 from app.schemas.api import (
     OfferComparisonOut,
     OfferOut,
@@ -41,6 +41,34 @@ async def relevant_requests(
     profile = await specialist_profile(session, specialist.user_id)
     pairs = await service.list_relevant_requests(session, profile)
     return [await request_out(session, request) for request, _ in pairs]
+
+
+@router.get("/specialist/cases", response_model=list[RequestOut])
+async def my_cases(session: SessionDep, specialist: SpecialistDep) -> list[RequestOut]:
+    """The cases this specialist was chosen for, whatever stage they have reached.
+
+    A request leaves the open feed the moment it is assigned, so without this the
+    specialist would lose the case in the same moment they accepted it.
+    """
+    rows = (
+        (
+            await session.execute(
+                select(Request)
+                .join(Selection, Selection.request_id == Request.id)
+                .where(
+                    Selection.specialist_id == specialist.user_id,
+                    Selection.status.in_(
+                        [SelectionStatus.pending, SelectionStatus.accepted]
+                    ),
+                    Request.deleted_at.is_(None),
+                )
+                .order_by(Request.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [await request_out(session, request) for request in rows]
 
 
 @router.get("/specialist/offers", response_model=list[OfferOut])

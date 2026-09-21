@@ -238,7 +238,7 @@ export default function RequestDetailPage() {
         </Card>
       )}
 
-      {comparison && (
+      {comparison && (request.status === "open" || request.status === "selecting") && (
         <Card
           title="مقایسهٔ پیشنهادها"
           subtitle="ترتیب پایدار است و به ترتیب رسیدن پیشنهادها بستگی ندارد."

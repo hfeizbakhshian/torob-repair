@@ -145,6 +145,14 @@ export const REQUEST_STATUS_LABELS: Record<string, string> = {
   closed_adjudicated: "بسته‌شده با حکم داوری",
 };
 
+export const OFFER_STATUS_LABELS: Record<string, string> = {
+  active: "در انتظار انتخاب",
+  selected: "انتخاب شد",
+  withdrawn: "پس‌گرفته شد",
+  expired: "مهلتش گذشت",
+  unselectable: "قابل انتخاب نیست",
+};
+
 export const OFFER_TYPE_LABELS: Record<string, string> = {
   fixed: "قطعی",
   conditional: "مشروط",

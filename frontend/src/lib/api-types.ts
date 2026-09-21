@@ -1197,6 +1197,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/specialist/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Cases
+         * @description The cases this specialist was chosen for, whatever stage they have reached.
+         *
+         *     A request leaves the open feed the moment it is assigned, so without this the
+         *     specialist would lose the case in the same moment they accepted it.
+         */
+        get: operations["my_cases_api_specialist_cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/specialist/offers": {
         parameters: {
             query?: never;
@@ -8402,6 +8425,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SelectionOut"];
+                };
+            };
+            /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description NOT_FOUND — مورد خواسته‌شده وجود ندارد */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VERSION_CONFLICT یا INVALID_STATE */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description VALIDATION_ERROR — ورودی معتبر نیست */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description QUOTA_EXCEEDED — سقف مصرف پر شده است */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description SERVICE_UNAVAILABLE — سرویس در دسترس نیست */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    my_cases_api_specialist_cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOut"][];
                 };
             };
             /** @description FORBIDDEN — نقش یا مالکیت اجازه نمی‌دهد */

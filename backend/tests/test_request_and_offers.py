@@ -13,8 +13,8 @@ from app.domain import requests as request_service
 from app.domain.auth import specialist_profile
 from app.domain.errors import DomainError, ErrorCode
 from app.domain.money import LineItem
-from app.models import Offer, OfferVersion, Payment, Request
-from app.models.enums import OfferType, PaymentStatus, RequestStatus
+from app.models import Offer, OfferVersion, Payment, Request, Selection
+from app.models.enums import OfferType, PaymentStatus, RequestStatus, SelectionStatus
 from app.providers.payment import Outcome, get_gateway
 from tests import factories
 
@@ -402,3 +402,36 @@ async def test_a_live_case_cannot_be_deleted(session, policy):
         )
     assert live.value.code is ErrorCode.INVALID_STATE
     assert request.deleted_at is None
+
+
+async def test_the_chosen_specialist_keeps_the_case_after_it_leaves_the_open_feed(
+    session, policy
+):
+    """Assignment removes a request from every open feed, including the winner's."""
+    request = await factories.published_request(session, policy)
+    await factories.submit_offer(session, policy, request, "specialist-arya")
+    selection = await factories.accepted_collaboration(
+        session, policy, request, "specialist-arya"
+    )
+    await session.commit()
+
+    assert request.status is RequestStatus.assigned
+    profile = await specialist_profile(session, selection.specialist_id)
+    open_feed = await offer_service.list_relevant_requests(session, profile)
+    assert request.id not in {row.id for row, _ in open_feed}
+
+    mine = (
+        (
+            await session.execute(
+                select(Request)
+                .join(Selection, Selection.request_id == Request.id)
+                .where(
+                    Selection.specialist_id == selection.specialist_id,
+                    Selection.status == SelectionStatus.accepted,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert [row.id for row in mine] == [request.id]
