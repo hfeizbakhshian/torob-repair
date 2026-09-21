@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 
+import httpx
 import pytest
 from sqlalchemy import select
 
@@ -17,6 +18,7 @@ from app.domain.ai_service import AiOutcome, AiService, estimate_tokens
 from app.domain.errors import DomainError, ErrorCode
 from app.models import AiRun, BudgetReservation
 from app.models.enums import AiPurpose, AiRunStatus, AiStage
+from app.providers.ai.avalai import AvalAiProvider
 from app.providers.ai.base import AiMessage, AiRequest, AiResponse, AiUsage
 from app.providers.ai.deepseek import DeepSeekConfigError, DeepSeekProvider
 from app.providers.ai.mock import MockAiProvider
@@ -501,3 +503,50 @@ async def test_a_stranger_cannot_use_the_shared_stage(session, policy, advance):
             service, selection_id=selection.id, actor_id=other.id, question="سلام"
         )
     assert error.value.code is ErrorCode.FORBIDDEN
+
+
+@pytest.mark.parametrize("failed", [False, True])
+async def test_avalai_response_is_recorded_by_domain_service(session, policy, failed):
+    import json
+
+    request = await factories.published_request(session, policy)
+    calls = []
+
+    def handler(req):
+        calls.append(req)
+        body = {
+            "choices": [{
+                "message": {"content": json.dumps(VALID_QUESTIONS)},
+                "finish_reason": "error" if failed else "stop",
+            }],
+            "usage": {
+                "prompt_tokens": 0 if failed else 321,
+                "completion_tokens": 0 if failed else 123,
+            },
+        }
+        if failed:
+            body["avalai"] = {"failed": True, "error": "content-blocked"}
+        return httpx.Response(200, json=body)
+
+    provider = AvalAiProvider(
+        api_key="test", base_url="http://avalai.test/v1", model="deepseek-v4-flash",
+        transport=httpx.MockTransport(handler),
+    )
+    outcome = await _run(AiService(provider, policy), request.id)
+    await session.close()
+    run = (await session.execute(select(AiRun))).scalars().one()
+    reservation = (await session.execute(select(BudgetReservation))).scalars().one()
+    assert len(calls) == 1
+    assert run.provider == "avalai" and run.model == "deepseek-v4-flash"
+    if failed:
+        assert not outcome.ok
+        assert run.error_code == "content_blocked"
+        assert run.output_payload is None
+        assert run.actual_input_tokens is None
+        assert reservation.unresolved
+        assert not run.counts_as_successful_turn
+    else:
+        assert outcome.ok
+        assert run.actual_input_tokens == 321 and run.actual_output_tokens == 123
+        assert not reservation.unresolved
+        assert run.counts_as_successful_turn

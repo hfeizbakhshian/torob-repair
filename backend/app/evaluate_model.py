@@ -201,6 +201,7 @@ async def run(provider: AiProvider) -> int:
             max_output_tokens=1000,
             thinking_enabled=task in THINKING,
             reasoning_effort="low" if task in THINKING else None,
+            timeout_seconds=settings.ai_request_timeout_seconds,
         )
         response = await provider.complete(request)
 
@@ -277,9 +278,9 @@ def main() -> int:
         if settings.ai_mode != "live":
             print("برای اجرای واقعی، AI_MODE=live را تنظیم کنید.")
             return 1
-        from app.providers.ai.deepseek import DeepSeekProvider
+        from app.domain.ai_service import build_provider
 
-        provider: AiProvider = DeepSeekProvider()
+        provider: AiProvider = build_provider()
         print("هشدار: این اجرا تماس پولی با مدل دارد.\n")
     else:
         from app.providers.ai.mock import MockAiProvider

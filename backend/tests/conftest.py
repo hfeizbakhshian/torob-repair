@@ -72,6 +72,17 @@ async def session(engine: object) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture(autouse=True)
+def isolated_ai_settings(monkeypatch):
+    """A local live .env must never turn the default test suite into paid model calls."""
+    monkeypatch.setattr(settings, "ai_mode", "mock")
+    monkeypatch.setattr(settings, "ai_provider", "deepseek")
+    monkeypatch.setattr(settings, "ai_api_key", None)
+    monkeypatch.setattr(settings, "ai_base_url", None)
+    monkeypatch.setattr(settings, "ai_model", "deepseek-flash")
+    monkeypatch.setattr(settings, "ai_enforce_cost_cap", True)
+
+
+@pytest.fixture(autouse=True)
 def isolated_attachment_dir(tmp_path, monkeypatch):
     """Uploads go to a per-test temporary directory, never the demo file store."""
     monkeypatch.setattr(settings, "attachment_dir", tmp_path / "attachments")

@@ -45,17 +45,20 @@ class Settings(BaseSettings):
 
     # --- AI ---------------------------------------------------------------
     ai_mode: Literal["mock", "live"] = "mock"
+    ai_provider: Literal["deepseek", "avalai"] = "deepseek"
     ai_model: str = "deepseek-flash"
     ai_api_key: str | None = None
     ai_base_url: str | None = None
     ai_request_timeout_seconds: float = 45.0
     ai_retry_delay_seconds: float = 2.0
     ai_input_price_per_million: int | None = None
-    """Recorded tariff in Toman per million input tokens; required in live mode."""
+    """Recorded tariff in Toman per million input tokens; absent means cost is unknown."""
     ai_output_price_per_million: int | None = None
     ai_tariff_recorded_at: str | None = None
     ai_daily_cost_cap_toman: int = 0
-    """Whole-installation daily live spend cap. Defaults to the ~1 USD equivalent below."""
+    """Whole-installation daily live spend cap; zero blocks calls when enforcement is on."""
+    ai_enforce_cost_cap: bool = True
+    """Explicitly disable only for local usage measurement; token usage is still recorded."""
 
     # --- worker -----------------------------------------------------------
     worker_poll_seconds: float = 10.0

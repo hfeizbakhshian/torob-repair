@@ -184,7 +184,7 @@ class AiService:
 
     async def _check_daily_cap(self, session: AsyncSession) -> None:
         """Whole-installation live spend cap, covering every case, appeal and retry."""
-        if not self._is_live():
+        if not self._is_live() or not settings.ai_enforce_cost_cap:
             return
         cap = settings.ai_daily_cost_cap_toman
         if cap <= 0:
@@ -428,7 +428,11 @@ class AiService:
                     max_output_tokens=max_output,
                     thinking_enabled=thinking,
                     reasoning_effort="low" if thinking else None,
-                    timeout_seconds=self.policy.ai.request_timeout_seconds,
+                    timeout_seconds=(
+                        settings.ai_request_timeout_seconds
+                        if self.provider.name == "avalai"
+                        else self.policy.ai.request_timeout_seconds
+                    ),
                 )
             )
 
@@ -494,6 +498,10 @@ class AiService:
             payload=None,
             error_code=last_error,
             message=(
+                "ارائه‌دهندهٔ مدل این درخواست را با خطای content-blocked رد کرد. "
+                "داده‌های پرونده حفظ شده‌اند و ادامه از فرم دستی ممکن است."
+                if last_error == "content_blocked"
+                else
                 "پاسخ معتبری از مدل دریافت نشد. نتیجه به‌صورت «در انتظار/اطلاعات ناکافی» "
                 "ثبت می‌شود و امتیاز یا مبلغ ساختگی ساخته نمی‌شود."
             ),
@@ -508,6 +516,10 @@ class AiService:
 def build_provider() -> AiProvider:
     """Pick the provider from configuration. A bad live setup fails loudly."""
     if settings.ai_mode == "live":
+        if settings.ai_provider == "avalai":
+            from app.providers.ai.avalai import AvalAiProvider
+
+            return AvalAiProvider()
         from app.providers.ai.deepseek import DeepSeekProvider
 
         return DeepSeekProvider()
