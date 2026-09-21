@@ -30,7 +30,7 @@ from app.models import (
     Request,
     Selection,
 )
-from app.models.enums import Party, ReceiptStatus, RequestStatus, SelectionStatus
+from app.models.enums import CloseReason, Party, ReceiptStatus, RequestStatus, SelectionStatus
 from app.policy import Policy
 from app.repository.locking import check_revision, lock_row
 
@@ -496,7 +496,7 @@ async def confirm_completion(
     selection.ended_at = now()
     selection.bump()
     request.status = RequestStatus.completed
-    request.close_reason = None
+    request.close_reason = CloseReason.completed_normally
     request.closed_at = now()
     request.bump()
 
