@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,11 +33,33 @@ def db_session(request: Request) -> AsyncSession:
 SessionDep = Annotated[AsyncSession, Depends(db_session)]
 
 
-async def check_origin(request: Request) -> None:
-    """Reject a state-changing request whose Origin is not the configured web origin.
+_LOOPBACK_TWIN = {"127.0.0.1": "localhost", "localhost": "127.0.0.1"}
 
-    Forwarded headers are only meaningful from the local trusted proxy; Next.js never
-    becomes an independent source of session or role.
+
+def allowed_origins() -> frozenset[str]:
+    """The configured web origin, plus its loopback twin.
+
+    `localhost` and `127.0.0.1` are the same machine but not the same origin string, and a
+    local demo gets opened under either name. Nothing else is added: a non-loopback host
+    has exactly the one origin it was configured with.
+    """
+    configured = settings.web_origin.rstrip("/")
+    parts = urlsplit(configured)
+    origins = {configured}
+    twin = _LOOPBACK_TWIN.get(parts.hostname or "")
+    if twin is not None:
+        netloc = twin if parts.port is None else f"{twin}:{parts.port}"
+        origins.add(urlunsplit((parts.scheme, netloc, "", "", "")))
+    return frozenset(origins)
+
+
+async def check_origin(request: Request) -> None:
+    """Reject a state-changing request whose Origin is not an allowed web origin.
+
+    Applied to every route rather than to the ones that happen to need a principal: the
+    call that mints a session cookie needs no principal and must not skip this. Forwarded
+    headers are only meaningful from the local trusted proxy; Next.js never becomes an
+    independent source of session or role.
     """
     if request.method in SAFE_METHODS:
         return
@@ -45,7 +68,7 @@ async def check_origin(request: Request) -> None:
         # Same-origin form posts and server-side proxy calls may omit it; the session
         # cookie is SameSite=Lax, which already blocks the cross-site case.
         return
-    if origin != settings.web_origin:
+    if origin not in allowed_origins():
         raise DomainError(
             ErrorCode.FORBIDDEN, "منبع این درخواست مجاز نیست."
         )

@@ -75,6 +75,33 @@ async def test_cross_origin_state_change_is_refused(client: AsyncClient):
     assert response.status_code == 403
 
 
+async def test_sign_in_is_not_exempt_from_the_origin_check(client: AsyncClient):
+    """The one call that mints a session cookie needs no principal; it is still checked."""
+    response = await client.post(
+        "/api/auth/sign-in",
+        json={"loginKey": "customer-sahar"},
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "FORBIDDEN"
+
+
+async def test_the_loopback_twin_of_the_web_origin_is_allowed(client: AsyncClient):
+    """localhost and 127.0.0.1 are one machine opened under two names."""
+    assert settings.web_origin == "http://127.0.0.1:3000"
+    response = await client.post(
+        "/api/auth/sign-in",
+        json={"loginKey": "customer-sahar"},
+        headers={"Origin": "http://localhost:3000"},
+    )
+    assert response.status_code == 200
+
+    signed_out = await client.post(
+        "/api/auth/sign-out", headers={"Origin": "http://localhost:3000"}
+    )
+    assert signed_out.status_code < 400
+
+
 async def test_validation_errors_use_the_shared_contract(client: AsyncClient):
     await sign_in(client, "customer-sahar")
     response = await client.post("/api/requests", json={"city": "تهران"})

@@ -10,9 +10,10 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from app.api import errors
+from app.api.deps import check_origin
 from app.api.routes import (
     ai,
     auth,
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
         responses=ERROR_RESPONSES,
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
+        dependencies=[Depends(check_origin)],
     )
     app.add_middleware(UnitOfWorkMiddleware)
     errors.install(app)
