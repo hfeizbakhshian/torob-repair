@@ -17,6 +17,8 @@ from app.models import AgreementVersion, Approval, Offer, OfferVersion, Request,
 from app.models.enums import (
     AgreementStatus,
     OfferStatus,
+    OfferType,
+    Party,
     RequestStatus,
     SelectionStatus,
 )
@@ -321,7 +323,15 @@ async def test_agreement_needs_both_approvals_of_the_same_version(session, polic
     await session.commit()
     await session.refresh(agreement)
     assert agreement.status is AgreementStatus.active
-    assert agreement.base_offer_version_id == selection.offer_version_id
+    base = (
+        await session.execute(
+            select(AgreementVersion)
+            .where(AgreementVersion.selection_id == selection.id)
+            .order_by(AgreementVersion.version_number)
+        )
+    ).scalars().first()
+    assert base is not None
+    assert base.base_offer_version_id == selection.offer_version_id
 
 
 async def test_editing_a_draft_does_not_carry_approvals_over(session, policy):
@@ -341,11 +351,6 @@ async def test_editing_a_draft_does_not_carry_approvals_over(session, policy):
         change_reason=None,
         evidence_ids=[],
         policy=policy,
-    )
-    await session.commit()
-    await agreement_service.approve_version(
-        session, agreement_id=first.id, actor_id=request.customer_id,
-        expected_revision=first.revision,
     )
     await session.commit()
 
@@ -370,7 +375,7 @@ async def test_editing_a_draft_does_not_carry_approvals_over(session, policy):
             )
         ).scalars()
     )
-    assert approvals == []
+    assert [approval.party for approval in approvals] == [Party.specialist]
     await session.refresh(first)
     assert first.status is AgreementStatus.superseded
 
@@ -470,7 +475,14 @@ async def test_stale_expected_revision_is_a_version_conflict(session, policy):
 
 async def test_work_cannot_start_before_two_approvals(session, policy):
     request = await factories.published_request(session, policy)
-    await factories.submit_offer(session, policy, request, "specialist-arya")
+    await factories.submit_offer(
+        session,
+        policy,
+        request,
+        "specialist-arya",
+        offer_type=OfferType.conditional,
+        scenarios=[{"code": "kit_only", "title": "تعویض کیت", "totalToman": 5_000_000}],
+    )
     selection = await factories.accepted_collaboration(
         session, policy, request, "specialist-arya"
     )

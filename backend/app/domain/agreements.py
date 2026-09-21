@@ -143,7 +143,17 @@ async def propose_version(
         and totals.total_toman is not None
         and totals.total_toman > base_total
     )
-    if (previous_active is not None or is_increase) and not change_reason:
+    # Accepting a fixed offer puts its own terms in force straight away. While nothing has
+    # been renegotiated since, those terms are still the base rather than an agreement the
+    # two sides argued over, so the first real draft is initial — exactly as it was when
+    # the base sat in the offer instead of an agreement row.
+    base_only = (
+        previous_active is not None
+        and previous_active.version_number == 1
+        and previous_active.base_offer_version_id is not None
+        and previous_active.change_reason is None
+    )
+    if ((previous_active is not None and not base_only) or is_increase) and not change_reason:
         raise invalid_state(
             "تغییر توافق فعال یا افزایش مبلغ نسبت به مبنا باید دلیل ثبت‌شده داشته باشد."
         )
@@ -292,6 +302,10 @@ async def approve_version(
             previous.status = AgreementStatus.superseded
             previous.ended_at = now()
             previous.bump()
+            # One active version per selection is a partial unique index, and the order of
+            # UPDATEs inside a flush is not ours to choose: the old version has to be
+            # superseded in the database before the new one is allowed to become active.
+            await session.flush()
         agreement.status = AgreementStatus.active
         agreement.activated_at = now()
         selection.scheduled_at = agreement.scheduled_at

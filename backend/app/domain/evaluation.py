@@ -89,6 +89,16 @@ async def build_change_chain(
     for agreement in agreements:
         if agreement.activated_at is None:
             continue
+        if (
+            previous_label == "selected_offer"
+            and agreement.total_toman == previous_total
+            and agreement.change_reason is None
+        ):
+            # Accepting a fixed offer puts its own terms in force unchanged. That is not a
+            # step anyone took, so it is not put to the evaluation as one; the first real
+            # departure from the selected offer keeps the weight it deserves.
+            previous_total = agreement.total_toman
+            continue
         delta = (
             None
             if previous_total is None or agreement.total_toman is None

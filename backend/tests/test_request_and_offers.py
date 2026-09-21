@@ -376,7 +376,7 @@ async def test_deleting_is_idempotent_and_only_for_the_owner(session, policy):
         await request_service.delete_request(
             session, request_id=request.id, customer_id=other.id, expected_revision=None
         )
-    assert stranger.value.code is ErrorCode.forbidden
+    assert stranger.value.code is ErrorCode.FORBIDDEN
 
     await request_service.delete_request(
         session, request_id=request.id, customer_id=customer.id, expected_revision=None
@@ -400,5 +400,5 @@ async def test_a_live_case_cannot_be_deleted(session, policy):
             customer_id=request.customer_id,
             expected_revision=request.revision,
         )
-    assert live.value.code is ErrorCode.invalid_state
+    assert live.value.code is ErrorCode.INVALID_STATE
     assert request.deleted_at is None
